@@ -1,4 +1,4 @@
-// Entry point — Phase 3: cops + heat + pursuit + busted.
+// Entry point — Phase 3.1 (cops + heat + pursuit + busted + props).
 
 import { Save } from './save.js';
 import { Input } from './input.js';
@@ -10,6 +10,7 @@ import { Glitch } from './glitch.js';
 import { NitroFX } from './nitro.js';
 import { Heat } from './heat.js';
 import { CopsManager } from './cops.js';
+import { Props } from './props.js';
 import { resolveBuildingCollision, clampToWorld } from './physics.js';
 
 const canvas = document.getElementById('game');
@@ -37,6 +38,7 @@ const game = {
   world: null,
   car: null,
   cops: null,
+  props: null,
   pinnedTimer: 0,
 };
 
@@ -46,6 +48,7 @@ function initWorld() {
   const start = game.world.city.start;
   game.car = new Car(start.x, start.y);
   game.cops = new CopsManager(game.world);
+  game.props = new Props(game.world);
   Heat.reset();
   game.pinnedTimer = 0;
   Camera.x = start.x;
@@ -62,7 +65,6 @@ function busted(reason) {
   Glitch.trigger(30);
   Camera.addShake(20);
 
-  // NFS MW-ish penalty: lose 20% cash, reset heat
   const lost = Math.floor(Save.data.cash * 0.2);
   Save.data.cash = Math.max(0, Save.data.cash - lost);
   Save.data.heatRecord = Math.max(Save.data.heatRecord, Math.floor(Heat.stars));
@@ -116,19 +118,15 @@ function loop(now) {
 
     game.world.update(dt);
 
-    // Heat + cops
+    // Cops + props + heat
     game.cops.update(dt, game.car);
-    Heat.update(dt, game.cops.activeCount);
-
-    // Passive heat from high speed
-    if (game.car.speedKmh > 200) Heat.addHeat(0.02 * dt);
+    game.props.update(dt, game.car);
+    Heat.update(dt, game.cops.activeCount, game.car);
 
     // Busted condition 1: health = 0
-    if (game.car.health <= 0) {
-      busted('CAR DESTROYED');
-    }
+    if (game.car.health <= 0) busted('CAR DESTROYED');
 
-    // Busted condition 2: pinned by cops while slow
+    // Busted condition 2: surrounded while slow
     const copCount = game.cops.cops.length;
     const sp = Math.hypot(game.car.vx, game.car.vy);
     const surrounded = copCount >= 4 && sp < 60;
@@ -155,6 +153,7 @@ function loop(now) {
   Camera.apply(ctx, W, H);
 
   if (game.world) game.world.draw(ctx);
+  if (game.props) game.props.draw(ctx);
   if (game.cops)  game.cops.draw(ctx);
   if (game.car)   game.car.draw(ctx);
 
@@ -170,12 +169,8 @@ function loop(now) {
     }
   }
 
-  // Nitro FX
   if (game.car) NitroFX.draw(ctx, W, H, game.car);
-
-  // Radar
   drawRadar(ctx, W, H);
-
   Glitch.draw(ctx, W, H);
 
   requestAnimationFrame(loop);
@@ -189,7 +184,6 @@ function drawRadar(ctx, W, H) {
 
   ctx.save();
 
-  // Base circle
   ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
   ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
   ctx.lineWidth = 2;
@@ -198,14 +192,12 @@ function drawRadar(ctx, W, H) {
   ctx.fill();
   ctx.stroke();
 
-  // Crosshair
   ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
   ctx.beginPath();
   ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
   ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
   ctx.stroke();
 
-  // Player dot
   ctx.fillStyle = '#0ff';
   ctx.shadowColor = '#0ff';
   ctx.shadowBlur = 8;
@@ -213,7 +205,6 @@ function drawRadar(ctx, W, H) {
   ctx.arc(cx, cy, 4, 0, Math.PI * 2);
   ctx.fill();
 
-  // Cops
   game.cops.drawOnRadar(ctx, game.car, cx, cy, r);
 
   ctx.restore();

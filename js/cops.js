@@ -215,11 +215,11 @@ export class CopsManager {
   // Called every frame
   update(dt, player) {
     const heat = Heat.stars;
-    const maxCops = maxCopsForHeat(heat);
+    const maxCops = Math.max(2, maxCopsForHeat(heat)); // always allow at least 2
 
     // Spawn new cops
     this.spawnTimer += dt;
-    if (this.spawnTimer > 1.2 && this.cops.length < maxCops && heat >= 1) {
+    if (this.spawnTimer > 1.2 && this.cops.length < maxCops && heat >= 0.4) {
       this.spawnTimer = 0;
       this.spawnCop(player, heat);
     }

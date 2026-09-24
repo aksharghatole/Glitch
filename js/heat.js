@@ -1,12 +1,11 @@
-// NFS MW 2005-style heat system.
+// NFS MW 2005-style heat system — tuned so pursuit actually happens.
 
 export const Heat = {
-  stars: 0,          // 0..10, fractional internally
+  stars: 0,
   displayStars: 0,
   decayTimer: 0,
-  decayDelay: 4,     // seconds before decay starts
-  decayRate: 0.25,   // stars per second
-  riseRate: 0.4,     // stars per second during chaos
+  decayDelay: 4,
+  decayRate: 0.35,
   maxStars: 10,
 
   reset() {
@@ -20,11 +19,18 @@ export const Heat = {
     this.decayTimer = 0;
   },
 
-  // Called every frame
-  update(dt, activeCops) {
+  update(dt, activeCops, player) {
+    // Baseline: ANY decent speed raises heat slowly.
+    if (player) {
+      const kmh = player.speedKmh;
+      if (kmh > 80)  this.addHeat(0.10 * dt);   // normal driving
+      if (kmh > 160) this.addHeat(0.25 * dt);   // speeding
+      if (kmh > 240) this.addHeat(0.40 * dt);   // reckless
+    }
+
+    // Active pursuit — heat climbs fast
     if (activeCops > 0) {
-      // being pursued → slight rise over time
-      this.addHeat(0.02 * dt * activeCops * 0.5);
+      this.addHeat(0.30 * dt * Math.min(activeCops, 6));
       this.decayTimer = 0;
     } else if (this.stars > 0) {
       this.decayTimer += dt;
@@ -33,7 +39,6 @@ export const Heat = {
       }
     }
 
-    // Smooth display number
     this.displayStars += (this.stars - this.displayStars) * Math.min(1, dt * 6);
   },
 
