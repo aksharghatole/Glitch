@@ -231,3 +231,33 @@ body::after {
 @media (hover: hover) and (pointer: fine) {
   #touch-actions { display: none; }
 }
+/* Busted screen */
+#busted-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 0, 0, 0.92);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 20;
+  text-align: center;
+}
+#busted-screen.show { display: flex; }
+
+.busted-title {
+  font-size: clamp(40px, 10vw, 96px);
+  color: #ff0033;
+  letter-spacing: 12px;
+  text-shadow: 0 0 20px #ff0033, 0 0 40px #ff0033;
+  animation: bustedPulse 1s infinite;
+}
+@keyframes bustedPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(1.04); }
+}
+.busted-reason { color: #ff6666; letter-spacing: 4px; font-size: 14px; }
+.busted-lost   { color: #ffaa00; letter-spacing: 4px; font-size: 20px; text-shadow: 0 0 12px #ffaa00; }
+.busted-heat   { color: #ff00d4; letter-spacing: 3px; font-size: 14px; }
+#btn-busted-restart { margin-top: 20px; }

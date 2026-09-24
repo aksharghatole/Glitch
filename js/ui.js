@@ -37,8 +37,10 @@ export const UI = {
   setCtrlMode(mode) {
     this.els.ctrlMode.value = mode;
   },
-  updateHUD(car) {
+  updateHUD(car, heatStars = 0) {
     this.els.speed.textContent = car.speedKmh + ' KM/H';
     this.els.nitroFill.style.width = car.nitro + '%';
+    if (this.els.heat) {
+      this.els.heat.textContent = '★ ' + heatStars;
   },
 };
