@@ -173,3 +173,61 @@ body::after {
   );
   z-index: 4;
 }
+/* Touch action buttons */
+#touch-actions {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  touch-action: none;
+}
+
+.action-btn {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid #0ff;
+  background: rgba(0, 255, 255, 0.08);
+  color: #0ff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px #0ff;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6),
+              inset 0 0 20px rgba(0, 255, 255, 0.15);
+  transition: transform 0.08s, background 0.08s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  min-width: 0;
+  cursor: pointer;
+}
+.action-btn:active,
+.action-btn.active {
+  background: rgba(0, 255, 255, 0.35);
+  transform: scale(0.92);
+  box-shadow: 0 0 32px #0ff, inset 0 0 24px rgba(0,255,255,0.4);
+}
+
+.nitro-btn {
+  border-color: #ff00d4;
+  color: #ff00d4;
+  text-shadow: 0 0 10px #ff00d4;
+  background: rgba(255, 0, 212, 0.08);
+  box-shadow: 0 0 20px rgba(255, 0, 212, 0.6),
+              inset 0 0 20px rgba(255, 0, 212, 0.15);
+}
+.nitro-btn:active,
+.nitro-btn.active {
+  background: rgba(255, 0, 212, 0.4);
+  box-shadow: 0 0 32px #ff00d4, inset 0 0 24px rgba(255,0,212,0.5);
+}
+
+/* Only show touch buttons on touch devices */
+@media (hover: hover) and (pointer: fine) {
+  #touch-actions { display: none; }
+}

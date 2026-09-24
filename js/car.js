@@ -40,7 +40,7 @@ export class Car {
     const ay = Input.axis.y;
 
     // Nitro input
-    const nitroKey = Input.keys['shift'] || Input.mouse.down;
+    const nitroKey = Input.keys['shift'] || Input.mouse.down || Input.nitroHeld;
     const wantBoost = nitroKey && this.nitro > 1;
 
     if (wantBoost && !this.nitroActive) {
