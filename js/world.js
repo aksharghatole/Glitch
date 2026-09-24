@@ -1,4 +1,4 @@
-// Builds a city: roads (grid) + buildings in blocks + landmarks.
+// City + environment objects + day/night tint.
 
 import { CITIES } from '../data/cities.js';
 
@@ -11,6 +11,11 @@ export class World {
     this.blockSize = this.city.blockSize;
     this.buildings = [];
     this.landmarks = this.city.landmarks || [];
+    this.nitroStrips = this.city.nitroStrips || [];
+    this.ramps = this.city.ramps || [];
+    this.tunnels = this.city.tunnels || [];
+    this.time = 0;
+    this.dayNight = 0; // 0..1
     this._buildBuildings();
   }
 
@@ -28,7 +33,6 @@ export class World {
         const h = blockSize;
         if (x + w > width || y + h > height) continue;
 
-        // Carve out the center as a smaller building with margin (alley feel)
         const pad = 40;
         this.buildings.push({
           x: x + pad,
@@ -40,16 +44,19 @@ export class World {
     }
   }
 
-  // Called by physics — returns true if the point (car center) with radius hits a building
+  update(dt) {
+    this.time += dt;
+    // Full cycle ~90 seconds
+    this.dayNight = (Math.sin(this.time / 45) + 1) / 2;
+  }
+
   collidesCircle(cx, cy, radius) {
     for (const b of this.buildings) {
       const nx = Math.max(b.x, Math.min(cx, b.x + b.w));
       const ny = Math.max(b.y, Math.min(cy, b.y + b.h));
       const dx = cx - nx;
       const dy = cy - ny;
-      if (dx * dx + dy * dy < radius * radius) {
-        return b;
-      }
+      if (dx * dx + dy * dy < radius * radius) return b;
     }
     return null;
   }
@@ -61,8 +68,9 @@ export class World {
     ctx.fillStyle = palette.ground;
     ctx.fillRect(0, 0, this.w, this.h);
 
-    // Roads (full ground already acts as road; draw lane lines)
     this._drawRoadLines(ctx, palette);
+    this._drawNitroStrips(ctx);
+    this._drawRamps(ctx);
 
     // Buildings
     for (const b of this.buildings) {
@@ -76,30 +84,39 @@ export class World {
       ctx.strokeRect(b.x, b.y, b.w, b.h);
       ctx.shadowBlur = 0;
 
-      // Neon windows
       ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
       const step = 34;
       for (let wx = b.x + 12; wx < b.x + b.w - 12; wx += step) {
         for (let wy = b.y + 12; wy < b.y + b.h - 12; wy += step) {
-          if (((wx + wy) / step) % 3 < 1) {
-            ctx.fillRect(wx, wy, 14, 14);
-          }
+          if (((wx + wy) / step) % 3 < 1) ctx.fillRect(wx, wy, 14, 14);
         }
       }
     }
 
-    // Landmarks
-    for (const lm of this.landmarks) {
-      this._drawLandmark(ctx, lm);
+    for (const lm of this.landmarks) this._drawLandmark(ctx, lm);
+
+    // Tunnels (dark overlays — drawn last)
+    for (const t of this.tunnels) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.fillRect(t.x, t.y, t.w, t.h);
+      ctx.strokeStyle = '#0ff';
+      ctx.shadowColor = '#0ff';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(t.x, t.y, t.w, t.h);
+      ctx.shadowBlur = 0;
     }
 
-    // City border
+    // Border
     ctx.strokeStyle = 'rgba(255, 0, 212, 0.6)';
     ctx.lineWidth = 6;
     ctx.shadowColor = '#ff00d4';
     ctx.shadowBlur = 20;
     ctx.strokeRect(0, 0, this.w, this.h);
     ctx.shadowBlur = 0;
+
+    // Day/night tint overlay (canvas-level, done in main)
+    this._dayNightTint = this.dayNight;
   }
 
   _drawRoadLines(ctx, palette) {
@@ -109,7 +126,6 @@ export class World {
     ctx.lineWidth = 3;
     ctx.setLineDash([24, 20]);
 
-    // Horizontal center lines in each road strip
     for (let r = 0; r * stride <= height; r++) {
       const y = r * stride + roadWidth / 2;
       ctx.beginPath();
@@ -117,7 +133,6 @@ export class World {
       ctx.lineTo(width, y);
       ctx.stroke();
     }
-    // Vertical
     for (let c = 0; c * stride <= width; c++) {
       const x = c * stride + roadWidth / 2;
       ctx.beginPath();
@@ -128,12 +143,54 @@ export class World {
     ctx.setLineDash([]);
   }
 
+  _drawNitroStrips(ctx) {
+    for (const s of this.nitroStrips) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 200, 255, 0.35)';
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 25;
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+
+      // Chevrons
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 3;
+      const step = 30;
+      for (let i = 0; i < s.w; i += step) {
+        ctx.beginPath();
+        ctx.moveTo(s.x + i, s.y + 4);
+        ctx.lineTo(s.x + i + 12, s.y + s.h / 2);
+        ctx.lineTo(s.x + i, s.y + s.h - 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  _drawRamps(ctx) {
+    for (const r of this.ramps) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 0, 212, 0.25)';
+      ctx.strokeStyle = '#ff00d4';
+      ctx.shadowColor = '#ff00d4';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 3;
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+      // Arrow
+      ctx.fillStyle = '#ff00d4';
+      ctx.font = 'bold 20px Courier New';
+      ctx.textAlign = 'center';
+      const cx = r.x + r.w / 2;
+      const cy = r.y + r.h / 2 + 7;
+      ctx.fillText('▲', cx, cy);
+      ctx.restore();
+    }
+  }
+
   _drawLandmark(ctx, lm) {
-    const colors = {
-      tollgate: '#ff00d4',
-      church: '#00ff88',
-      parking: '#00ffff',
-    };
+    const colors = { tollgate: '#ff00d4', church: '#00ff88', parking: '#00ffff' };
     const c = colors[lm.type] || '#0ff';
     ctx.strokeStyle = c;
     ctx.shadowColor = c;

@@ -1,4 +1,4 @@
-// Entry point. Boots the game, runs the loop.
+// Entry point.
 
 import { Save } from './save.js';
 import { Input } from './input.js';
@@ -7,6 +7,7 @@ import { World } from './world.js';
 import { Car } from './car.js';
 import { UI } from './ui.js';
 import { Glitch } from './glitch.js';
+import { NitroFX } from './nitro.js';
 import { resolveBuildingCollision, clampToWorld } from './physics.js';
 
 const canvas = document.getElementById('game');
@@ -26,7 +27,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// ===== State =====
 Save.load();
 
 const game = {
@@ -43,10 +43,10 @@ function initWorld() {
   Camera.x = start.x;
   Camera.y = start.y;
   Camera.zoom = 0.85;
+  Camera.baseZoom = 0.85;
   Camera.targetZoom = 0.85;
 }
 
-// ===== UI wiring =====
 UI.init({
   onStart: () => {
     game.running = true;
@@ -58,14 +58,9 @@ UI.init({
 });
 
 UI.setCtrlMode(Save.data.settings.ctrlMode || 'wasd');
-
-// ===== Input boot =====
 Input.init(canvas);
-
-// ===== Boot world =====
 initWorld();
 
-// ===== Loop =====
 let last = performance.now();
 
 function loop(now) {
@@ -73,21 +68,23 @@ function loop(now) {
   last = now;
 
   if (game.running) {
-    game.car.update(dt);
+    game.car.update(dt, game.world);
 
-    resolveBuildingCollision(game.car, game.world);
+    if (!game.car.airborne) {
+      resolveBuildingCollision(game.car, game.world);
+    }
     clampToWorld(game.car, game.world);
 
+    game.world.update(dt);
     Camera.follow(game.car, dt);
     Glitch.update();
 
-    // Random ambient glitch
     if (Math.random() < 0.002) Glitch.trigger(8);
 
     UI.updateHUD(game.car);
   }
 
-  // === Draw ===
+  // ===== Draw =====
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#05010f';
   ctx.fillRect(0, 0, W, H);
@@ -99,6 +96,20 @@ function loop(now) {
   if (game.car)   game.car.draw(ctx);
 
   ctx.restore();
+
+  // Day/night tint (screen-space)
+  if (game.world) {
+    const n = game.world.dayNight;
+    // night 0 → dark overlay; day 1 → none
+    const nightStrength = (1 - n) * 0.35;
+    if (nightStrength > 0) {
+      ctx.fillStyle = `rgba(20, 0, 60, ${nightStrength})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // Nitro FX
+  if (game.car) NitroFX.draw(ctx, W, H, game.car);
 
   Glitch.draw(ctx, W, H);
 
