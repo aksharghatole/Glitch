@@ -28,10 +28,19 @@ export class Cop {
   update(dt, player, world) {
     const cfg = this.cfg;
 
-    if (cfg.static) {
-      // roadblock — doesn't move
-      return;
-    }
+    if (cfg.static) return;
+      // Recover timer — after being rammed, cop drifts briefly
+      if (this.recoverTimer === undefined) this.recoverTimer = 0;
+      if (this.recoverTimer > 0) {
+        this.recoverTimer -= dt;
+        // Drift (no target chase)
+        this.vx *= 0.97;
+        this.vy *= 0.97;
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.sirenPhase += dt * 12;
+        return;
+      }
 
     // Predict player position
     const leadTime = cfg.flying ? 0.6 : 0.35;
@@ -72,6 +81,18 @@ export class Cop {
     // Move
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+
+    // Detect heavy bump → enter recover
+    // (checks distance to player; if very overlapped and moving fast, back off)
+    const pdx = player.x - this.x;
+    const pdy = player.y - this.y;
+    const pd  = Math.hypot(pdx, pdy);
+    if (pd < this.radius + player.radius - 4) {
+      const relSp = Math.hypot(player.vx - this.vx, player.vy - this.vy);
+      if (relSp > 200) {
+        this.recoverTimer = 0.6;
+      }
+    }
 
     // Rotate
     if (sp > 10) {

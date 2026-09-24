@@ -6,6 +6,7 @@ import { Camera } from './camera.js';
 
 export class Car {
   constructor(x, y) {
+    this.momentum = 1.6;   // >1 = heavier, shoves cops harder
     this.x = x;
     this.y = y;
     this.vx = 0;
