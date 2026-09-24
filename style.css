@@ -1,0 +1,175 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #05010f;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  color: #0ff;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+canvas#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  background: #05010f;
+  touch-action: none;
+}
+
+/* HUD */
+#hud {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 24px;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #0ff;
+  text-shadow: 0 0 8px #0ff, 0 0 16px #0ff;
+  pointer-events: none;
+  z-index: 5;
+}
+#heat { color: #ff00d4; text-shadow: 0 0 8px #ff00d4; }
+#nitro-bar {
+  width: 160px;
+  height: 12px;
+  border: 1px solid #0ff;
+  background: rgba(0,255,255,0.05);
+  box-shadow: 0 0 10px #0ff;
+  overflow: hidden;
+}
+#nitro-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00ffff, #ff00d4);
+  transition: width 0.15s linear;
+}
+
+/* Overlay / menus */
+#overlay, #settings-panel {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 1, 15, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 10;
+  text-align: center;
+  padding: 24px;
+}
+#overlay.hide, #settings-panel.hidden { display: none; }
+
+.glitch {
+  font-size: clamp(28px, 6vw, 64px);
+  color: #0ff;
+  letter-spacing: 6px;
+  text-shadow: 2px 0 #ff00d4, -2px 0 #00ff88;
+  animation: glitch 2.4s infinite;
+}
+@keyframes glitch {
+  0%, 90%, 100% { transform: translate(0); }
+  92% { transform: translate(-3px, 1px); }
+  94% { transform: translate(3px, -2px); }
+  96% { transform: translate(-2px, 2px); }
+}
+.sub {
+  color: #ff00d4;
+  letter-spacing: 8px;
+  font-size: 14px;
+  text-shadow: 0 0 10px #ff00d4;
+}
+
+button {
+  padding: 12px 32px;
+  background: transparent;
+  border: 2px solid #0ff;
+  color: #0ff;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 3px;
+  cursor: pointer;
+  text-shadow: 0 0 8px #0ff;
+  box-shadow: 0 0 12px #0ff, inset 0 0 12px rgba(0,255,255,0.15);
+  transition: all 0.15s;
+  min-width: 180px;
+}
+button:hover, button:active {
+  background: #0ff;
+  color: #05010f;
+  box-shadow: 0 0 24px #0ff;
+}
+
+#settings-panel h2 { color: #0ff; letter-spacing: 4px; font-weight: normal; }
+#settings-panel label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #a0f0ff;
+  letter-spacing: 1px;
+  font-size: 14px;
+}
+#settings-panel select {
+  background: #05010f;
+  color: #0ff;
+  border: 1px solid #0ff;
+  padding: 8px 12px;
+  font-family: inherit;
+  letter-spacing: 1px;
+  font-size: 13px;
+}
+
+/* Joystick */
+#joystick-zone {
+  position: absolute;
+  bottom: 40px;
+  left: 40px;
+  z-index: 6;
+  display: none;
+  touch-action: none;
+}
+#joystick-zone.show { display: block; }
+#joystick-base {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 255, 255, 0.45);
+  background: rgba(0, 255, 255, 0.05);
+  box-shadow: 0 0 24px rgba(0, 255, 255, 0.4), inset 0 0 24px rgba(0,255,255,0.1);
+  position: relative;
+}
+#joystick-knob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 255, 255, 0.35);
+  box-shadow: 0 0 20px #0ff;
+  border: 2px solid #0ff;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Scanlines */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 255, 255, 0.025) 0px,
+    rgba(0, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 4;
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>GLITCH RUNNER: OVERDRIVE</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div id="heat">★ 0</div>
+    <div id="speed">0 KM/H</div>
+    <div id="nitro-bar"><div id="nitro-fill"></div></div>
+  </div>
+
+  <div id="joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-knob"></div>
+    </div>
+  </div>
+
+  <div id="overlay" class="show">
+    <h1 class="glitch" data-text="GLITCH RUNNER">GLITCH RUNNER</h1>
+    <p class="sub">// OVERDRIVE</p>
+    <button id="btn-start">START</button>
+    <button id="btn-settings">SETTINGS</button>
+  </div>
+
+  <div id="settings-panel" class="hidden">
+    <h2>SETTINGS</h2>
+    <label>Control Mode:
+      <select id="ctrl-mode">
+        <option value="wasd">WASD + Mouse</option>
+        <option value="joystick">Joystick only</option>
+        <option value="both">Both</option>
+      </select>
+    </label>
+    <button id="btn-close-settings">CLOSE</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

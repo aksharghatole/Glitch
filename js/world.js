@@ -1,0 +1,152 @@
+// Builds a city: roads (grid) + buildings in blocks + landmarks.
+
+import { CITIES } from '../data/cities.js';
+
+export class World {
+  constructor(cityId) {
+    this.city = CITIES[cityId] || CITIES.neon_district;
+    this.w = this.city.width;
+    this.h = this.city.height;
+    this.roadWidth = this.city.roadWidth;
+    this.blockSize = this.city.blockSize;
+    this.buildings = [];
+    this.landmarks = this.city.landmarks || [];
+    this._buildBuildings();
+  }
+
+  _buildBuildings() {
+    const { blockSize, roadWidth, width, height } = this.city;
+    const stride = blockSize + roadWidth;
+    const cols = Math.ceil(width / stride);
+    const rows = Math.ceil(height / stride);
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = c * stride + roadWidth;
+        const y = r * stride + roadWidth;
+        const w = blockSize;
+        const h = blockSize;
+        if (x + w > width || y + h > height) continue;
+
+        // Carve out the center as a smaller building with margin (alley feel)
+        const pad = 40;
+        this.buildings.push({
+          x: x + pad,
+          y: y + pad,
+          w: w - pad * 2,
+          h: h - pad * 2,
+        });
+      }
+    }
+  }
+
+  // Called by physics — returns true if the point (car center) with radius hits a building
+  collidesCircle(cx, cy, radius) {
+    for (const b of this.buildings) {
+      const nx = Math.max(b.x, Math.min(cx, b.x + b.w));
+      const ny = Math.max(b.y, Math.min(cy, b.y + b.h));
+      const dx = cx - nx;
+      const dy = cy - ny;
+      if (dx * dx + dy * dy < radius * radius) {
+        return b;
+      }
+    }
+    return null;
+  }
+
+  draw(ctx) {
+    const { palette } = this.city;
+
+    // Ground
+    ctx.fillStyle = palette.ground;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    // Roads (full ground already acts as road; draw lane lines)
+    this._drawRoadLines(ctx, palette);
+
+    // Buildings
+    for (const b of this.buildings) {
+      ctx.fillStyle = palette.building;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+
+      ctx.strokeStyle = palette.buildingEdge;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = palette.buildingEdge;
+      ctx.shadowBlur = 10;
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.shadowBlur = 0;
+
+      // Neon windows
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+      const step = 34;
+      for (let wx = b.x + 12; wx < b.x + b.w - 12; wx += step) {
+        for (let wy = b.y + 12; wy < b.y + b.h - 12; wy += step) {
+          if (((wx + wy) / step) % 3 < 1) {
+            ctx.fillRect(wx, wy, 14, 14);
+          }
+        }
+      }
+    }
+
+    // Landmarks
+    for (const lm of this.landmarks) {
+      this._drawLandmark(ctx, lm);
+    }
+
+    // City border
+    ctx.strokeStyle = 'rgba(255, 0, 212, 0.6)';
+    ctx.lineWidth = 6;
+    ctx.shadowColor = '#ff00d4';
+    ctx.shadowBlur = 20;
+    ctx.strokeRect(0, 0, this.w, this.h);
+    ctx.shadowBlur = 0;
+  }
+
+  _drawRoadLines(ctx, palette) {
+    const { width, height, roadWidth, blockSize } = this.city;
+    const stride = blockSize + roadWidth;
+    ctx.strokeStyle = palette.roadLine;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([24, 20]);
+
+    // Horizontal center lines in each road strip
+    for (let r = 0; r * stride <= height; r++) {
+      const y = r * stride + roadWidth / 2;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+    // Vertical
+    for (let c = 0; c * stride <= width; c++) {
+      const x = c * stride + roadWidth / 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  _drawLandmark(ctx, lm) {
+    const colors = {
+      tollgate: '#ff00d4',
+      church: '#00ff88',
+      parking: '#00ffff',
+    };
+    const c = colors[lm.type] || '#0ff';
+    ctx.strokeStyle = c;
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 18;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(lm.x, lm.y, 60, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = c;
+    ctx.font = 'bold 14px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(lm.label, lm.x, lm.y + 4);
+  }
+}
