@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Pocket Oddities — 20 Mini-Games",
+  "short_name": "Pocket Oddities",
+  "description": "20 tiny mobile-friendly games in one playable arcade.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1023",
+  "theme_color": "#0b1023",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
