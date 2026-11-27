@@ -13,9 +13,11 @@ export const NitroFX = {
     ctx.lineWidth = 2;
     const lines = 40;
     for (let i = 0; i < lines; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r1 = 200 + Math.random() * 200;
-      const r2 = r1 + 40 + Math.random() * 80;
+      const angle = i * 2.399963;
+      const span = Math.min(W, H) * 0.5;
+      const phase = (i * 0.61803398875 + performance.now() * 0.0015) % 1;
+      const r1 = span * (0.55 + phase * 0.9);
+      const r2 = r1 + span * (0.14 + phase * 0.22);
       const cx = W / 2;
       const cy = H / 2;
       ctx.beginPath();

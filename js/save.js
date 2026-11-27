@@ -23,9 +23,11 @@ export const Save = {
   load() {
     try {
       const raw = localStorage.getItem(KEY);
-      this.data = raw ? { ...DEFAULT, ...JSON.parse(raw) } : { ...DEFAULT };
+      const parsed = raw ? JSON.parse(raw) : {};
+      const mode = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'both' : 'wasd';
+      this.data = { ...structuredClone(DEFAULT), ...parsed, settings: { ctrlMode: mode, ...parsed?.settings } };
     } catch (e) {
-      this.data = { ...DEFAULT };
+      this.data = structuredClone(DEFAULT);
     }
     return this.data;
   },
@@ -37,7 +39,7 @@ export const Save = {
   },
 
   reset() {
-    this.data = { ...DEFAULT };
+    this.data = structuredClone(DEFAULT);
     this.save();
   },
 };

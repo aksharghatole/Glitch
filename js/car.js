@@ -16,6 +16,7 @@ export class Car {
     this.accel = 900;
     this.maxSpeed = 420;
     this.friction = 0.9;
+    this.drifting = false;
 
     this.health = 100;
     this.maxHealth = 100;
@@ -43,6 +44,12 @@ export class Car {
     // Nitro input
     const nitroKey = Input.keys['shift'] || Input.mouse.down || Input.nitroHeld;
     const wantBoost = nitroKey && this.nitro > 1;
+    const beforeSpeed = Math.hypot(this.vx, this.vy);
+    const steering = Math.hypot(ax, ay);
+    const turn = beforeSpeed > 0 && steering > 0 ?
+      (this.vx * ax + this.vy * ay) / (beforeSpeed * steering) : 1;
+    this.drifting = Boolean((Input.keys[' '] || Input.driftHeld) && !wantBoost &&
+      !this.airborne && beforeSpeed > 130 && steering > 0.15 && turn < 0.94);
 
     if (wantBoost && !this.nitroActive) {
       Glitch.trigger(10);
@@ -59,14 +66,20 @@ export class Car {
       if (sp > 150) {
         this.nitro = Math.min(100, this.nitro + this.nitroRegenRate * dt);
       }
-      this.boostFxTimer *= 0.9;
+      this.boostFxTimer *= Math.pow(0.9, dt * 60);
     }
 
     // Acceleration
     if (ax !== 0 || ay !== 0) {
       const boost = this.nitroActive ? this.boostMultiplier : 1;
-      this.vx += ax * this.accel * boost * dt;
-      this.vy += ay * this.accel * boost * dt;
+      const grip = this.drifting ? 0.48 : 1;
+      this.vx += ax * this.accel * boost * grip * dt;
+      this.vy += ay * this.accel * boost * grip * dt;
+      if (this.drifting) {
+        const drag = Math.exp(-0.35 * dt);
+        this.vx *= drag;
+        this.vy *= drag;
+      }
     }
 
     // Friction
@@ -89,11 +102,11 @@ export class Car {
 
     // Rotate to face velocity
     if (speed > 6) {
-      const target = Math.atan2(this.vy, this.vx);
+      const target = this.drifting ? Math.atan2(ay, ax) : Math.atan2(this.vy, this.vx);
       let diff = target - this.angle;
       while (diff > Math.PI)  diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      this.angle += diff * Math.min(1, dt * 10);
+      this.angle += diff * (1 - Math.exp(-(this.drifting ? 5 : 10) * dt));
     }
 
     // Airborne physics
@@ -128,6 +141,7 @@ export class Car {
           const sp = Math.hypot(this.vx, this.vy);
           if (sp > 200) {
             this.airborne = true;
+            this.drifting = false;
             this.vz = 420;
             Camera.addShake(8);
             Glitch.trigger(10);
