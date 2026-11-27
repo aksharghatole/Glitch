@@ -8,6 +8,12 @@ export const Camera = {
   boostZoom: 0.75,
   targetZoom: 0.85,
   shake: 0,
+  reduced: false,
+
+  setReducedMotion(value) {
+    this.reduced = Boolean(value);
+    if (this.reduced) this.shake = 0;
+  },
 
   follow(target, dt) {
     const lead = 0.25;
@@ -22,7 +28,10 @@ export const Camera = {
     this.targetZoom = target.nitroActive ? this.boostZoom : this.baseZoom;
     this.zoom += (this.targetZoom - this.zoom) * lerp * 0.5;
 
-    if (this.shake > 0) this.shake *= 0.9;
+  },
+
+  updateEffects(dt) {
+    if (this.shake > 0) this.shake *= Math.pow(0.9, Math.max(0, dt) * 60);
     if (this.shake < 0.1) this.shake = 0;
   },
 
@@ -36,6 +45,6 @@ export const Camera = {
   },
 
   addShake(amount) {
-    this.shake = Math.min(20, this.shake + amount);
+    if (!this.reduced) this.shake = Math.min(20, this.shake + amount);
   },
 };

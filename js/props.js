@@ -3,6 +3,7 @@
 import { Heat } from './heat.js';
 import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
+import { Impact } from './impact.js';
 
 export class Props {
   constructor(world) {
@@ -48,6 +49,7 @@ export class Props {
         if (sp > 120) {
           it.destroyed = true;
           Heat.addHeat(1.5);
+          Impact.hit(it.x, it.y, player.vx / sp, player.vy / sp, sp, '#ffaa55');
           Glitch.trigger(16);
           Camera.addShake(10);
           player.health = Math.max(0, player.health - 3);
