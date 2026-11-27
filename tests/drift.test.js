@@ -22,7 +22,7 @@ test('drift requires speed, turning and grounded vehicle; boost takes priority',
   keys({d:true,' ':true}); const straight = moving(); straight.update(dt); assert.equal(straight.drifting,false);
   keys({s:true,' ':true}); const slow = new Car(0,0); slow.update(dt); assert.equal(slow.drifting,false);
   const air = moving(); air.airborne=true; air.z=100; air.update(dt); assert.equal(air.drifting,false);
-  keys({s:true,' ':true',shift:true}); const boosted=moving(); boosted.update(dt);
+  keys({s:true,' ':true,shift:true}); const boosted=moving(); boosted.update(dt);
   assert.equal(boosted.drifting,false); assert.equal(boosted.nitroActive,true); assert.ok(boosted.nitro<100);
 });
 test('touch drift flag works and clear releases all held actions', () => {
