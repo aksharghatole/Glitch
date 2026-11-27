@@ -8,14 +8,19 @@ export const Input = {
   axis: { x: 0, y: 0 },
   joystickActive: false,
   joystickVec: { x: 0, y: 0 },
-  nitroHeld: false,          // NEW
+  nitroHeld: false,
+  driftHeld: false,
   mode: 'wasd',
 
   init(canvas) {
     this.canvas = canvas;
     this.mode = Save.data.settings.ctrlMode || 'wasd';
 
-    window.addEventListener('keydown', e => { this.keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keydown', e => {
+      if (e.target?.closest?.('button, select, input, textarea')) return;
+      if (e.key === ' ') e.preventDefault();
+      this.keys[e.key.toLowerCase()] = true;
+    });
     window.addEventListener('keyup',   e => { this.keys[e.key.toLowerCase()] = false; });
 
     window.addEventListener('mousemove', e => {
@@ -23,15 +28,19 @@ export const Input = {
       this.mouse.x = e.clientX - r.left;
       this.mouse.y = e.clientY - r.top;
     });
-    window.addEventListener('mousedown', () => this.mouse.down = true);
+    canvas.addEventListener('mousedown', () => this.mouse.down = true);
     window.addEventListener('mouseup',   () => this.mouse.down = false);
 
     this._initJoystick();
-    this._initNitroButton();
+    this._initActionButton('btn-nitro', 'nitroHeld');
+    this._initActionButton('btn-drift', 'driftHeld');
+    window.addEventListener('blur', () => this.clear());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.clear(); });
     this._applyModeVisibility();
   },
 
   setMode(mode) {
+    this.clear();
     this.mode = mode;
     this._applyModeVisibility();
     Save.data.settings.ctrlMode = mode;
@@ -72,31 +81,54 @@ export const Input = {
       this.joystickActive = true;
     };
 
-    base.addEventListener('touchstart', e => { e.preventDefault(); updateFromTouch(e.touches[0]); }, { passive: false });
-    base.addEventListener('touchmove',  e => { e.preventDefault(); if (e.touches.length) updateFromTouch(e.touches[0]); }, { passive: false });
-    base.addEventListener('touchend',   e => { e.preventDefault(); resetKnob(); }, { passive: false });
-    base.addEventListener('touchcancel', resetKnob);
-
-    let mouseDown = false;
-    base.addEventListener('mousedown', e => { mouseDown = true; updateFromTouch(e); });
-    window.addEventListener('mousemove', e => { if (mouseDown) updateFromTouch(e); });
-    window.addEventListener('mouseup', () => { if (mouseDown) { mouseDown = false; resetKnob(); } });
+    let pointer = null;
+    const release = e => {
+      if (e.pointerId !== pointer) return;
+      pointer = null;
+      resetKnob();
+    };
+    base.addEventListener('pointerdown', e => {
+      if (pointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
+      pointer = e.pointerId;
+      base.setPointerCapture(pointer);
+      updateFromTouch(e);
+    });
+    base.addEventListener('pointermove', e => {
+      if (e.pointerId === pointer) updateFromTouch(e);
+    });
+    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) base.addEventListener(event, release);
+    this._resetJoystick = () => { pointer = null; resetKnob(); };
   },
 
-  // NEW: nitro button wiring
-  _initNitroButton() {
-    const btn = document.getElementById('btn-nitro');
+  _initActionButton(id, field) {
+    const btn = document.getElementById(id);
     if (!btn) return;
+    let pointer = null;
+    btn.addEventListener('pointerdown', e => {
+      if (pointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
+      pointer = e.pointerId;
+      btn.setPointerCapture(pointer);
+      this[field] = true;
+      btn.classList.add('active');
+    });
+    const reset = () => { pointer = null; this[field] = false; btn.classList.remove('active'); };
+    const release = e => { if (e.pointerId === pointer) reset(); };
+    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(event, release);
+    (this._resetActions ??= []).push(reset);
+  },
 
-    const press   = e => { e.preventDefault(); this.nitroHeld = true;  btn.classList.add('active'); };
-    const release = e => { e.preventDefault(); this.nitroHeld = false; btn.classList.remove('active'); };
-
-    btn.addEventListener('touchstart',  press,   { passive: false });
-    btn.addEventListener('touchend',    release, { passive: false });
-    btn.addEventListener('touchcancel', release, { passive: false });
-    btn.addEventListener('mousedown',   press);
-    btn.addEventListener('mouseup',     release);
-    btn.addEventListener('mouseleave',  release);
+  clear() {
+    this.keys = {};
+    this.mouse.down = false;
+    this.axis = { x: 0, y: 0 };
+    this.joystickVec = { x: 0, y: 0 };
+    this.joystickActive = false;
+    this.nitroHeld = false;
+    this.driftHeld = false;
+    this._resetJoystick?.();
+    for (const reset of this._resetActions ?? []) reset();
   },
 
   update() {

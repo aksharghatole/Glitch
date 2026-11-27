@@ -261,3 +261,15 @@ body::after {
 .busted-lost   { color: #ffaa00; letter-spacing: 4px; font-size: 20px; text-shadow: 0 0 12px #ffaa00; }
 .busted-heat   { color: #ff00d4; letter-spacing: 3px; font-size: 14px; }
 #btn-busted-restart { margin-top: 20px; }
+
+.control-hint { color: #a0b8cc; font-size: 12px; line-height: 1.5; }
+.action-btn { touch-action: none; }
+@media (max-width: 520px) {
+  #touch-actions { right: 16px; bottom: 20px; gap: 10px; }
+  #joystick-zone { left: 16px; bottom: 20px; }
+  .action-btn { width: 72px; height: 72px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glitch, .busted-title { animation: none; }
+  button, #nitro-fill { transition: none; }
+}

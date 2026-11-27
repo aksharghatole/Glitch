@@ -8,6 +8,7 @@ import { Car } from './car.js';
 import { UI } from './ui.js';
 import { Glitch } from './glitch.js';
 import { Impact } from './impact.js';
+import { Trails } from './drift-trails.js';
 import { NitroFX } from './nitro.js';
 import { Heat } from './heat.js';
 import { CopsManager } from './cops.js';
@@ -37,6 +38,7 @@ Save.load();
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 function applyMotionPreference() {
   Impact.setReducedMotion(motion.matches);
+  Trails.setReducedMotion(motion.matches);
   Glitch.setReducedMotion(motion.matches);
   Camera.setReducedMotion(motion.matches);
 }
@@ -64,6 +66,7 @@ function initWorld() {
   game.traffic = new TrafficManager(game.world);
   Heat.reset();
   Impact.reset();
+  Trails.reset();
   Glitch.pulse = 0;
   Camera.shake = 0;
   game.pinnedTimer = 0;
@@ -162,6 +165,7 @@ function loop(now) {
     UI.updateHUD(game.car, Heat.wholeStars);
   }
 
+  Trails.update(dt, game.running ? game.car : null);
   Impact.update(dt);
   Glitch.update(dt);
   Camera.updateEffects(dt);
@@ -175,6 +179,7 @@ function loop(now) {
   Camera.apply(ctx, W, H);
 
   if (game.world) game.world.draw(ctx);
+  Trails.draw(ctx);
   if (game.props) game.props.draw(ctx);
   if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100);
   if (game.cops)  game.cops.draw(ctx);
@@ -193,7 +198,7 @@ function loop(now) {
     }
   }
 
-  if (game.car) NitroFX.draw(ctx, W, H, game.car);
+  if (game.car && !motion.matches) NitroFX.draw(ctx, W, H, game.car);
   drawRadar(ctx, W, H);
   Glitch.draw(ctx, W, H);
 
