@@ -127,7 +127,7 @@ function loop(now) {
     if (game.car.health <= 0) busted('CAR DESTROYED');
 
     // Busted condition 2: surrounded while slow
-    const copCount = game.cops.cops.length;
+    const copCount = game.cops.nearbyGroundCount;
     const sp = Math.hypot(game.car.vx, game.car.vy);
     const surrounded = copCount >= 4 && sp < 60;
     if (surrounded) {
