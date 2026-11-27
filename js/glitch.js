@@ -2,18 +2,24 @@
 
 export const Glitch = {
   pulse: 0,
+  reduced: false,
 
-  trigger(amount = 12) {
-    this.pulse = Math.max(this.pulse, amount);
+  setReducedMotion(value) {
+    this.reduced = Boolean(value);
+    if (this.reduced) this.pulse = 0;
   },
 
-  update() {
-    if (this.pulse > 0) this.pulse--;
+  trigger(amount = 12) {
+    if (!this.reduced) this.pulse = Math.max(this.pulse, Math.min(20, amount));
+  },
+
+  update(dt = 1 / 60) {
+    this.pulse = Math.max(0, this.pulse - Math.max(0, dt) * 60);
   },
 
   draw(ctx, W, H) {
     if (this.pulse <= 0) return;
-    const a = this.pulse / 20;
+    const a = Math.min(0.5, this.pulse / 40);
 
     ctx.save();
     ctx.globalAlpha = a;
