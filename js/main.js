@@ -1,7 +1,8 @@
 // Entry point — Phase 3.1 (cops + heat + pursuit + busted + props).
 
 import { Save } from './save.js';
-import { TRIALS, TimeTrial, recordTrial } from './activities.js';
+import { TimeTrial, recordTrial } from './activities.js';
+import { ACTIVITIES, StreetRace, recordRace } from './races.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
@@ -129,11 +130,12 @@ const trialResult = document.getElementById('trial-result');
 const trialSelect = document.getElementById('trial-select');
 function refreshTrials() {
   trialSelect.replaceChildren();
-  for (const route of TRIALS.filter(r => r.city === game.world.city.id)) {
+  for (const route of ACTIVITIES.filter(r => r.city === game.world.city.id)) {
     const option = document.createElement('option');
     option.value = route.id;
-    const best = Save.data.trialRecords?.[route.id];
-    option.textContent = route.name + ' · ' + route.limit + 's · $' + route.reward +
+    const race = route.mode === 'race';
+    const best = race ? Save.data.raceRecords?.[route.id]?.elapsed : Save.data.trialRecords?.[route.id];
+    option.textContent = (race ? 'RACE · ' : 'TRIAL · ') + route.name + ' · ' + route.limit + 's · $' + route.reward +
       (Number.isFinite(best) ? ' · PB ' + best.toFixed(2) + 's' : '');
     trialSelect.append(option);
   }
@@ -143,7 +145,7 @@ function startTrial(route) {
   if (!route) return;
   void Audio.unlock();
   initWorld();
-  game.trial = new TimeTrial(route);
+  game.trial = route.mode === 'race' ? new StreetRace(route) : new TimeTrial(route);
   const start = route.points[0];
   game.car.x = Camera.x = start.x;
   game.car.y = Camera.y = start.y;
@@ -161,15 +163,17 @@ function refreshTrialHUD() {
   if (!t || !game.running) return;
   trialHUD.textContent = t.state === 'countdown' ? 'GET READY · ' + Math.ceil(t.countdown) :
     t.route.name + ' · ' + Math.min(t.index,t.route.points.length-1) + '/' +
-    (t.route.points.length-1) + ' · ' + t.remaining.toFixed(1) + 's';
+    (t.route.points.length-1) + ' · ' + t.remaining.toFixed(1) + 's' +
+    (t.route.mode === 'race' ? ' · P'+t.position+'/4' : '');
 }
 function finishTrial() {
   const t = game.trial;
   game.running = false;
   Input.clear();
-  const earned = recordTrial(Save.data,t.route,t.result);
+  const race = t.route.mode === 'race';
+  const earned = race ? recordRace(Save.data,t.route,t.result) : recordTrial(Save.data,t.route,t.result);
   if (earned) Save.save();
-  document.getElementById('trial-title').textContent = earned ? 'TRIAL COMPLETE' : 'TRIAL FAILED';
+  document.getElementById('trial-title').textContent = earned ? (race ? 'RACE COMPLETE · P'+earned.position+'/4' : 'TRIAL COMPLETE') : (race ? 'RACE FAILED' : 'TRIAL FAILED');
   document.getElementById('trial-summary').textContent = earned ?
     t.elapsed.toFixed(2) + 's · +$' + earned.reward + (earned.personalBest ? ' · NEW BEST' : '') : t.result.reason;
   trialResult.hidden = false;
@@ -183,7 +187,7 @@ function freeRoam() {
   UI.hideOverlay();
   refreshTrialHUD();
 }
-document.getElementById('btn-trial').addEventListener('click', () => startTrial(TRIALS.find(r => r.id === trialSelect.value)));
+document.getElementById('btn-trial').addEventListener('click', () => startTrial(ACTIVITIES.find(r => r.id === trialSelect.value)));
 document.getElementById('btn-retry-trial').addEventListener('click', () => startTrial(game.trial?.route));
 document.getElementById('btn-free-roam').addEventListener('click', freeRoam);
 document.getElementById('btn-activities').addEventListener('click', () => {
@@ -300,6 +304,7 @@ function loop(now) {
   const night = 1 - (game.world?.dayNight ?? 0.5);
   if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100, night);
   if (game.cops)  game.cops.draw(ctx, night);
+  game.trial?.drawRivals?.(ctx,night);
   if (game.car)   game.car.draw(ctx, night);
   Impact.draw(ctx);
 
@@ -352,6 +357,11 @@ function drawRadar(ctx, W, H) {
   ctx.fill();
 
   game.cops.drawOnRadar(ctx, game.car, cx, cy, r);
+  for(const rival of game.trial?.rivals ?? []){
+    const dx=rival.x-game.car.x,dy=rival.y-game.car.y;
+    const scale=(r-6)/Math.max(2000,Math.hypot(dx,dy));
+    ctx.fillStyle=rival.color;ctx.beginPath();ctx.arc(cx+dx*scale,cy+dy*scale,3,0,Math.PI*2);ctx.fill();
+  }
   const target=game.trial?.target;
   if(target){
     const dx=target.x-game.car.x,dy=target.y-game.car.y;

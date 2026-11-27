@@ -13,6 +13,7 @@ const DEFAULT = {
   equippedParts: {},
   milestones: {},
   trialRecords: {},
+  raceRecords: {},
   settings: {
     ctrlMode: 'wasd',
     audioVolume: 0.5,
