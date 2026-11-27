@@ -4,6 +4,7 @@ import { Heat } from './heat.js';
 import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
 import { Impact } from './impact.js';
+import { Audio } from './audio.js';
 
 export class Props {
   constructor(world) {
@@ -49,6 +50,7 @@ export class Props {
         if (sp > 120) {
           it.destroyed = true;
           Heat.addHeat(1.5);
+          Audio.hit(sp);
           Impact.hit(it.x, it.y, player.vx / sp, player.vy / sp, sp, '#ffaa55');
           Glitch.trigger(16);
           Camera.addShake(10);
@@ -77,3 +79,4 @@ export class Props {
     }
   }
 }
+

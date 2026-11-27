@@ -1,6 +1,7 @@
 // Entry point — Phase 3.1 (cops + heat + pursuit + busted + props).
 
 import { Save } from './save.js';
+import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { World } from './world.js';
@@ -34,6 +35,26 @@ window.addEventListener('resize', resize);
 resize();
 
 Save.load();
+Audio.setVolume(Save.data.settings.audioVolume);
+Audio.setMuted(Save.data.settings.audioMuted);
+const volume = document.getElementById('audio-volume');
+const mute = document.getElementById('audio-mute');
+function syncAudioControls() {
+  volume.value = Math.round(Audio.volume * 100);
+  mute.checked = Audio.muted;
+  document.getElementById('btn-sound').textContent = Audio.muted ? 'SOUND OFF' : 'SOUND ON';
+  document.getElementById('btn-sound').setAttribute('aria-pressed', String(!Audio.muted));
+}
+function persistAudio() {
+  Save.data.settings.audioVolume = Audio.volume;
+  Save.data.settings.audioMuted = Audio.muted;
+  Save.save(); syncAudioControls();
+}
+volume.addEventListener('input', () => { Audio.setVolume(Number(volume.value)/100); persistAudio(); });
+mute.addEventListener('change', () => { Audio.setMuted(mute.checked); persistAudio(); if (!Audio.muted) void Audio.unlock(); });
+document.getElementById('btn-sound').addEventListener('click', () => { Audio.setMuted(!Audio.muted); persistAudio(); if (!Audio.muted) void Audio.unlock(); });
+syncAudioControls();
+document.addEventListener('visibilitychange', () => { if (document.hidden) Audio.update(null,[],0,false,0); });
 
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 function applyMotionPreference() {
@@ -99,6 +120,7 @@ function busted(reason) {
 }
 
 function respawn() {
+  void Audio.unlock();
   const el = document.getElementById('busted-screen');
   if (el) el.classList.remove('show');
   game.busted = false;
@@ -108,6 +130,7 @@ function respawn() {
 
 UI.init({
   onStart: () => {
+    void Audio.unlock();
     if (game.busted) { respawn(); return; }
     game.running = true;
     UI.hideOverlay();
@@ -165,6 +188,7 @@ function loop(now) {
     UI.updateHUD(game.car, Heat.wholeStars);
   }
 
+  Audio.update(game.car, game.cops.cops, Math.hypot(Input.axis.x, Input.axis.y), game.running && !document.hidden, now/1000);
   Trails.update(dt, game.running ? game.car : null);
   Impact.update(dt);
   Glitch.update(dt);

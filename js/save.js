@@ -14,6 +14,8 @@ const DEFAULT = {
   milestones: {},
   settings: {
     ctrlMode: 'wasd',
+    audioVolume: 0.5,
+    audioMuted: false,
   },
 };
 
@@ -25,7 +27,7 @@ export const Save = {
       const raw = localStorage.getItem(KEY);
       const parsed = raw ? JSON.parse(raw) : {};
       const mode = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'both' : 'wasd';
-      this.data = { ...structuredClone(DEFAULT), ...parsed, settings: { ctrlMode: mode, ...parsed?.settings } };
+      this.data = { ...structuredClone(DEFAULT), ...parsed, settings: { ...DEFAULT.settings, ctrlMode: mode, ...parsed?.settings } };
     } catch (e) {
       this.data = structuredClone(DEFAULT);
     }

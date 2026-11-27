@@ -273,3 +273,6 @@ body::after {
   .glitch, .busted-title { animation: none; }
   button, #nitro-fill { transition: none; }
 }
+
+.sound-toggle { position:absolute; z-index:7; top:48px; left:20px; min-width:0; padding:6px 10px; font-size:10px; letter-spacing:1px; }
+#audio-volume, #audio-mute { accent-color:#0ff; }
