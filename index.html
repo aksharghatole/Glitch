@@ -12,9 +12,12 @@
   <div id="hud">
     <div id="heat">★ 0</div>
     <div id="speed">0 KM/H</div>
+    <div id="cash">$0</div>
     <div id="nitro-bar"><div id="nitro-fill"></div></div>
   </div>
 
+  <div id="trial-hud" hidden></div>
+  <button id="btn-activities" class="sound-toggle activities-toggle">ACTIVITIES</button>
   <button id="btn-sound" class="sound-toggle" aria-pressed="true">SOUND ON</button>
 
   <div id="joystick-zone">
@@ -33,7 +36,9 @@
     <h1 class="glitch" data-text="GLITCH RUNNER">GLITCH RUNNER</h1>
     <p class="sub">// OVERDRIVE</p>
     <p class="control-hint">WASD / Joystick · SHIFT / Nitro · SPACE / Drift</p>
-    <button id="btn-start">START</button>
+    <button id="btn-start">FREE ROAM</button>
+    <label class="trial-label">Time trial <select id="trial-select" aria-label="Choose time trial"></select></label>
+    <button id="btn-trial">START TRIAL</button>
     <button id="btn-settings">SETTINGS</button>
   </div>
 
@@ -51,6 +56,11 @@
     <button id="btn-close-settings">CLOSE</button>
   </div>
 
+  <section id="trial-result" hidden>
+    <h2 id="trial-title"></h2><p id="trial-summary"></p>
+    <button id="btn-retry-trial">RETRY TRIAL</button>
+    <button id="btn-free-roam">FREE ROAM</button>
+  </section>
   <script type="module" src="js/main.js"></script>
     <div id="busted-screen">
     <h1 class="busted-title">BUSTED</h1>
