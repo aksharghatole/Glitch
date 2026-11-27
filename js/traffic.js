@@ -3,6 +3,7 @@ import { Heat } from './heat.js';
 import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
 import { Impact } from './impact.js';
+import { drawVehicle } from './vehicle-art.js';
 
 const COLORS = ['#5475a6', '#b76f48', '#617e77', '#8b649f', '#b6bac6'];
 const RADIUS = 19;
@@ -43,24 +44,11 @@ export class Civilian {
   get vx() { return this.lane.axis === 'x' ? this.speed * this.lane.direction : 0; }
   get vy() { return this.lane.axis === 'y' ? this.speed * this.lane.direction : 0; }
 
-  draw(ctx) {
+  draw(ctx, night = 0.5) {
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x,this.y);
     ctx.rotate(this.angle);
-    ctx.fillStyle = '#080710';
-    ctx.fillRect(-18, -13, 36, 26);
-    ctx.fillStyle = this.color;
-    ctx.fillRect(-18, -10, 36, 20);
-    ctx.fillStyle = '#192334';
-    ctx.fillRect(-7, -8, 14, 16);
-    ctx.fillStyle = '#8ca5b7';
-    ctx.fillRect(5, -7, 3, 14);
-    ctx.fillStyle = '#fff2bf';
-    ctx.fillRect(15, -8, 3, 5);
-    ctx.fillRect(15, 3, 3, 5);
-    ctx.fillStyle = this.speed < this.cruise * 0.6 ? '#ff3b45' : '#972c42';
-    ctx.fillRect(-18, -8, 3, 5);
-    ctx.fillRect(-18, 3, 3, 5);
+    drawVehicle(ctx,{color:this.color,braking:this.speed<this.cruise*0.6,night});
     ctx.restore();
   }
 }
@@ -157,7 +145,7 @@ export class TrafficManager {
     }
   }
 
-  draw(ctx, player, range = 1300) {
-    for (const car of this.cars) if (distance(car, player) <= range) car.draw(ctx);
+  draw(ctx, player, range = 1300, night = 0.5) {
+    for (const car of this.cars) if (distance(car, player) <= range) car.draw(ctx, night);
   }
 }

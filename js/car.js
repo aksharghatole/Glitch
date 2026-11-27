@@ -3,6 +3,7 @@
 import { Input } from './input.js';
 import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
+import { drawVehicle } from './vehicle-art.js';
 
 export class Car {
   constructor(x, y) {
@@ -155,65 +156,18 @@ export class Car {
     return Math.round(Math.hypot(this.vx, this.vy) * 0.35);
   }
 
-  draw(ctx) {
+  draw(ctx, night = 0.5) {
     ctx.save();
-    ctx.translate(this.x, this.y - this.z);
-
-    // Shadow (offset by height)
-    ctx.save();
-    ctx.translate(0, this.z);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.translate(this.x, this.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.beginPath();
-    ctx.ellipse(3, 5, 26 + this.z * 0.1, 16 + this.z * 0.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(3,5,26+this.z*0.1,16+this.z*0.05,0,0,Math.PI*2);
     ctx.fill();
-    ctx.restore();
-
+    ctx.translate(0,-this.z);
     ctx.rotate(this.angle);
-
-    // Boost trail
-    if (this.nitroActive) {
-      ctx.fillStyle = 'rgba(0, 200, 255, 0.6)';
-      ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = 30;
-      const t = 30 + Math.random() * 20;
-      ctx.beginPath();
-      ctx.moveTo(-18, -8);
-      ctx.lineTo(-18 - t, 0);
-      ctx.lineTo(-18, 8);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // Glow
-    ctx.shadowColor = '#0ff';
-    ctx.shadowBlur = 20;
-
-    // Body
-    ctx.fillStyle = '#0ff';
-    ctx.beginPath();
-    ctx.moveTo(26, 0);
-    ctx.lineTo(-10, -16);
-    ctx.lineTo(-18, -10);
-    ctx.lineTo(-18, 10);
-    ctx.lineTo(-10, 16);
-    ctx.closePath();
-    ctx.fill();
-
-    // Cockpit
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#05010f';
-    ctx.beginPath();
-    ctx.moveTo(6, 0);
-    ctx.lineTo(-4, -8);
-    ctx.lineTo(-10, 0);
-    ctx.lineTo(-4, 8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Accent
-    ctx.fillStyle = '#ff00d4';
-    ctx.fillRect(-16, -2, 6, 4);
-
+    drawVehicle(ctx, {kind:'sport',color:'#1089a3',accent:'#65faff',player:true,
+      boost:this.nitroActive,reduced:Camera.reduced,phase:performance.now()/1000,
+      health:this.health/this.maxHealth,night});
     ctx.restore();
   }
 }
