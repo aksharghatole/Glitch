@@ -11,6 +11,7 @@ import { NitroFX } from './nitro.js';
 import { Heat } from './heat.js';
 import { CopsManager } from './cops.js';
 import { Props } from './props.js';
+import { TrafficManager } from './traffic.js';
 import { resolveBuildingCollision, clampToWorld } from './physics.js';
 
 const canvas = document.getElementById('game');
@@ -39,6 +40,7 @@ const game = {
   car: null,
   cops: null,
   props: null,
+  traffic: null,
   pinnedTimer: 0,
 };
 
@@ -49,6 +51,7 @@ function initWorld() {
   game.car = new Car(start.x, start.y);
   game.cops = new CopsManager(game.world);
   game.props = new Props(game.world);
+  game.traffic = new TrafficManager(game.world);
   Heat.reset();
   game.pinnedTimer = 0;
   Camera.x = start.x;
@@ -121,6 +124,9 @@ function loop(now) {
     // Cops + props + heat
     game.cops.update(dt, game.car);
     game.props.update(dt, game.car);
+    game.traffic.update(dt, game.car);
+    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
+    clampToWorld(game.car, game.world);
     Heat.update(dt, game.cops.activeCount, game.car);
 
     // Busted condition 1: health = 0
@@ -154,6 +160,7 @@ function loop(now) {
 
   if (game.world) game.world.draw(ctx);
   if (game.props) game.props.draw(ctx);
+  if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100);
   if (game.cops)  game.cops.draw(ctx);
   if (game.car)   game.car.draw(ctx);
 
