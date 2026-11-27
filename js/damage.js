@@ -5,15 +5,21 @@ import { Camera } from './camera.js';
 import { Heat } from './heat.js';
 
 export function handleCarCollision(player, cop, dt) {
+  // Air support tracks the player but is not a physical ground obstacle.
+  if (cop.cfg?.flying) return false;
   const dx = cop.x - player.x;
   const dy = cop.y - player.y;
-  const dist = Math.hypot(dx, dy) || 0.001;
+  const dist = Math.hypot(dx, dy);
   const minDist = player.radius + cop.radius;
   if (dist >= minDist) return false;
 
   // Normal (from player toward cop)
-  const nx = dx / dist;
-  const ny = dy / dist;
+  // At identical centers, use the approach direction or a stable fallback.
+  const approachX = player.vx - cop.vx;
+  const approachY = player.vy - cop.vy;
+  const approach = Math.hypot(approachX, approachY);
+  const nx = dist > 0 ? dx / dist : approach > 0 ? approachX / approach : 1;
+  const ny = dist > 0 ? dy / dist : approach > 0 ? approachY / approach : 0;
   const overlap = minDist - dist;
 
   // Relative velocity along normal
@@ -22,14 +28,14 @@ export function handleCarCollision(player, cop, dt) {
   const relVelAlongNormal = rvx * nx + rvy * ny;
 
   // Player momentum = speed toward the cop
-  const playerSpeed = Math.hypot(player.vx, player.vy);
   const playerMomentum = Math.max(0, (player.vx * nx + player.vy * ny));
 
   // ===== Weighted separation =====
   // Player is HEAVY: only 15% of overlap pushed onto player.
   // Cop takes 85%. Stops the "magnet stick" feel.
-  const playerShare = 0.15;
-  const copShare    = 0.85;
+  const anchored = Boolean(cop.cfg?.static);
+  const playerShare = anchored ? 1 : 0.15;
+  const copShare = 1 - playerShare;
 
   player.x -= nx * overlap * playerShare;
   player.y -= ny * overlap * playerShare;
@@ -43,12 +49,15 @@ export function handleCarCollision(player, cop, dt) {
     const j = -relVelAlongNormal * restitution;
 
     // Cop gets 90% of the impulse → shoved away
-    cop.vx += nx * j * 0.9;
-    cop.vy += ny * j * 0.9;
+    if (!anchored) {
+      cop.vx += nx * j * 0.9;
+      cop.vy += ny * j * 0.9;
+    }
 
     // Player only loses 10% → keeps momentum
-    player.vx -= nx * j * 0.1;
-    player.vy -= ny * j * 0.1;
+    const playerImpulse = anchored ? 0.8 : 0.1;
+    player.vx -= nx * j * playerImpulse;
+    player.vy -= ny * j * playerImpulse;
 
     // ===== Damage based on PLAYER SPEED (not relative) =====
     // Ram hard → big damage to cop, small damage to you.
@@ -71,8 +80,11 @@ export function handleCarCollision(player, cop, dt) {
   }
 
   // Slight lateral friction so cops don't slide forever
-  cop.vx *= 0.96;
-  cop.vy *= 0.96;
+  if (!anchored) {
+    const friction = Math.pow(0.96, Math.max(0, dt ?? 1 / 60) * 60);
+    cop.vx *= friction;
+    cop.vy *= friction;
+  }
 
   return true;
 }
