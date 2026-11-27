@@ -124,16 +124,79 @@ function busted(reason) {
   }
 }
 
-const trialHUD=document.getElementById('trial-hud');
-const trialResult=document.getElementById('trial-result');
-const trialSelect=document.getElementById('trial-select');
+const trialHUD = document.getElementById('trial-hud');
+const trialResult = document.getElementById('trial-result');
+const trialSelect = document.getElementById('trial-select');
 function refreshTrials() {
   trialSelect.replaceChildren();
-  for(const route of TRIALS.filter(r=>r.city===game.world.city.id)){
-    const option=document.createElement('option');
-    option.value=route.id;
-    const best=Save.data.trialRecords?.[route.id];
-    option.textContent=route.name+' · '+route.limit+'s · 
+  for (const route of TRIALS.filter(r => r.city === game.world.city.id)) {
+    const option = document.createElement('option');
+    option.value = route.id;
+    const best = Save.data.trialRecords?.[route.id];
+    option.textContent = route.name + ' · ' + route.limit + 's · $' + route.reward +
+      (Number.isFinite(best) ? ' · PB ' + best.toFixed(2) + 's' : '');
+    trialSelect.append(option);
+  }
+  document.getElementById('btn-trial').disabled = !trialSelect.options.length;
+}
+function startTrial(route) {
+  if (!route) return;
+  void Audio.unlock();
+  initWorld();
+  game.trial = new TimeTrial(route);
+  const start = route.points[0];
+  game.car.x = Camera.x = start.x;
+  game.car.y = Camera.y = start.y;
+  Input.clear();
+  trialResult.hidden = true;
+  UI.hideOverlay();
+  game.running = true;
+  game.busted = false;
+  refreshTrialHUD();
+}
+function refreshTrialHUD() {
+  const t = game.trial;
+  trialHUD.hidden = !t || !game.running;
+  document.getElementById('cash').textContent = '$' + Math.floor(Save.data.cash || 0);
+  if (!t || !game.running) return;
+  trialHUD.textContent = t.state === 'countdown' ? 'GET READY · ' + Math.ceil(t.countdown) :
+    t.route.name + ' · ' + Math.min(t.index,t.route.points.length-1) + '/' +
+    (t.route.points.length-1) + ' · ' + t.remaining.toFixed(1) + 's';
+}
+function finishTrial() {
+  const t = game.trial;
+  game.running = false;
+  Input.clear();
+  const earned = recordTrial(Save.data,t.route,t.result);
+  if (earned) Save.save();
+  document.getElementById('trial-title').textContent = earned ? 'TRIAL COMPLETE' : 'TRIAL FAILED';
+  document.getElementById('trial-summary').textContent = earned ?
+    t.elapsed.toFixed(2) + 's · +$' + earned.reward + (earned.personalBest ? ' · NEW BEST' : '') : t.result.reason;
+  trialResult.hidden = false;
+  refreshTrialHUD();
+}
+function freeRoam() {
+  trialResult.hidden = true;
+  initWorld();
+  Input.clear();
+  game.running = true;
+  UI.hideOverlay();
+  refreshTrialHUD();
+}
+document.getElementById('btn-trial').addEventListener('click', () => startTrial(TRIALS.find(r => r.id === trialSelect.value)));
+document.getElementById('btn-retry-trial').addEventListener('click', () => startTrial(game.trial?.route));
+document.getElementById('btn-free-roam').addEventListener('click', freeRoam);
+document.getElementById('btn-activities').addEventListener('click', () => {
+  if (!game.running || game.busted) return;
+  game.trial?.fail('ABANDONED');
+  game.running = false;
+  Input.clear();
+  refreshTrials();
+  refreshTrialHUD();
+  UI.showOverlay();
+});
+
+function respawn() {
   void Audio.unlock();
   const el = document.getElementById('busted-screen');
   if (el) el.classList.remove('show');
@@ -142,6 +205,7 @@ function refreshTrials() {
   if(route) { startTrial(route); return; }
   initWorld();
   game.running = true;
+  refreshTrialHUD();
 }
 
 UI.init({
@@ -294,503 +358,6 @@ function drawRadar(ctx, W, H) {
     const scale=(r-6)/Math.max(2000,Math.hypot(dx,dy));
     ctx.fillStyle='#ffe66b';ctx.beginPath();ctx.arc(cx+dx*scale,cy+dy*scale,5,0,Math.PI*2);ctx.fill();
   }
-
-  ctx.restore();
-}
-
-requestAnimationFrame(loop);
-+route.reward+(Number.isFinite(best)?' · PB '+best.toFixed(2)+'s':'');
-    trialSelect.append(option);
-  }
-}
-function startTrial(route) {
-  if(!route)return;
-  void Audio.unlock();
-  initWorld();
-  game.trial=new TimeTrial(route);
-  const start=route.points[0];
-  game.car.x=Camera.x=start.x;
-  game.car.y=Camera.y=start.y;
-  Input.clear();
-  trialResult.hidden=true;
-  UI.hideOverlay();
-  game.running=true;
-  game.busted=false;
-}
-function refreshTrialHUD() {
-  const t=game.trial;
-  trialHUD.hidden=!t || !game.running;
-  document.getElementById('cash').textContent='
-  void Audio.unlock();
-  const el = document.getElementById('busted-screen');
-  if (el) el.classList.remove('show');
-  game.busted = false;
-  initWorld();
-  game.running = true;
-}
-
-UI.init({
-  onStart: () => {
-    void Audio.unlock();
-    if (game.busted) { respawn(); return; }
-    game.running = true;
-    UI.hideOverlay();
-  },
-  onOpenSettings: () => UI.showSettings(),
-  onCloseSettings: () => UI.hideSettings(),
-  onSetCtrlMode: (mode) => Input.setMode(mode),
-});
-
-document.getElementById('btn-busted-restart')?.addEventListener('click', respawn);
-
-UI.setCtrlMode(Save.data.settings.ctrlMode || 'wasd');
-Input.init(canvas);
-initWorld();
-
-let last = performance.now();
-
-function loop(now) {
-  const dt = Math.min(0.033, (now - last) / 1000);
-  last = now;
-
-  if (game.running && !game.busted) {
-    game.car.update(dt, game.world);
-
-    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
-    clampToWorld(game.car, game.world);
-
-    game.world.update(dt);
-
-    // Cops + props + heat
-    game.cops.update(dt, game.car);
-    game.props.update(dt, game.car);
-    game.traffic.update(dt, game.car);
-    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
-    clampToWorld(game.car, game.world);
-    Heat.update(dt, game.cops.activeCount, game.car);
-
-    // Busted condition 1: health = 0
-    if (game.car.health <= 0) busted('CAR DESTROYED');
-
-    // Busted condition 2: surrounded while slow
-    const copCount = game.cops.nearbyGroundCount;
-    const sp = Math.hypot(game.car.vx, game.car.vy);
-    const surrounded = copCount >= 4 && sp < 60;
-    if (surrounded) {
-      game.pinnedTimer += dt;
-      if (game.pinnedTimer > 2.5) busted('SURROUNDED');
-    } else {
-      game.pinnedTimer = 0;
-    }
-
-    Camera.follow(game.car, dt);
-    if (Math.random() < 1 - Math.pow(0.998, dt * 60)) Glitch.trigger(8);
-
-    UI.updateHUD(game.car, Heat.wholeStars);
-  }
-
-  Audio.update(game.car, game.cops.cops, Math.hypot(Input.axis.x, Input.axis.y), game.running && !document.hidden, now/1000);
-  Trails.update(dt, game.running ? game.car : null);
-  Impact.update(dt);
-  Glitch.update(dt);
-  Camera.updateEffects(dt);
-
-  // ===== Draw =====
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#05010f';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  Camera.apply(ctx, W, H);
-
-  if (game.world) game.world.draw(ctx);
-  Trails.draw(ctx);
-  if (game.props) game.props.draw(ctx);
-  const night = 1 - (game.world?.dayNight ?? 0.5);
-  if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100, night);
-  if (game.cops)  game.cops.draw(ctx, night);
-  if (game.car)   game.car.draw(ctx, night);
-  Impact.draw(ctx);
-
-  ctx.restore();
-
-  // Day/night
-  if (game.world) {
-    const n = game.world.dayNight;
-    const nightStrength = (1 - n) * 0.35;
-    if (nightStrength > 0) {
-      ctx.fillStyle = `rgba(20, 0, 60, ${nightStrength})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-  }
-
-  if (game.car && !motion.matches) NitroFX.draw(ctx, W, H, game.car);
-  drawRadar(ctx, W, H);
-  Glitch.draw(ctx, W, H);
-
-  requestAnimationFrame(loop);
-}
-
-function drawRadar(ctx, W, H) {
-  if (!game.car || !game.cops) return;
-  const cx = W - 100;
-  const cy = 100;
-  const r  = 70;
-
-  ctx.save();
-
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-  ctx.beginPath();
-  ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
-  ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-  ctx.stroke();
-
-  ctx.fillStyle = '#0ff';
-  ctx.shadowColor = '#0ff';
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  game.cops.drawOnRadar(ctx, game.car, cx, cy, r);
-
-  ctx.restore();
-}
-
-requestAnimationFrame(loop);
-+Math.floor(Save.data.cash||0);
-  if(!t||!game.running)return;
-  const text=t.state==='countdown'?'GET READY · '+Math.ceil(t.countdown):
-    t.route.name+' · '+Math.min(t.index,t.route.points.length-1)+'/'+(t.route.points.length-1)+' · '+t.remaining.toFixed(1)+'s';
-  trialHUD.textContent=text;
-}
-function finishTrial() {
-  const t=game.trial;
-  game.running=false;
-  Input.clear();
-  const earned=recordTrial(Save.data,t.route,t.result);
-  if(earned)Save.save();
-  document.getElementById('trial-title').textContent=earned?'TRIAL COMPLETE':'TRIAL FAILED';
-  document.getElementById('trial-summary').textContent=earned?
-    t.elapsed.toFixed(2)+'s · +
-  void Audio.unlock();
-  const el = document.getElementById('busted-screen');
-  if (el) el.classList.remove('show');
-  game.busted = false;
-  initWorld();
-  game.running = true;
-}
-
-UI.init({
-  onStart: () => {
-    void Audio.unlock();
-    if (game.busted) { respawn(); return; }
-    game.running = true;
-    UI.hideOverlay();
-  },
-  onOpenSettings: () => UI.showSettings(),
-  onCloseSettings: () => UI.hideSettings(),
-  onSetCtrlMode: (mode) => Input.setMode(mode),
-});
-
-document.getElementById('btn-busted-restart')?.addEventListener('click', respawn);
-
-UI.setCtrlMode(Save.data.settings.ctrlMode || 'wasd');
-Input.init(canvas);
-initWorld();
-
-let last = performance.now();
-
-function loop(now) {
-  const dt = Math.min(0.033, (now - last) / 1000);
-  last = now;
-
-  if (game.running && !game.busted) {
-    game.car.update(dt, game.world);
-
-    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
-    clampToWorld(game.car, game.world);
-
-    game.world.update(dt);
-
-    // Cops + props + heat
-    game.cops.update(dt, game.car);
-    game.props.update(dt, game.car);
-    game.traffic.update(dt, game.car);
-    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
-    clampToWorld(game.car, game.world);
-    Heat.update(dt, game.cops.activeCount, game.car);
-
-    // Busted condition 1: health = 0
-    if (game.car.health <= 0) busted('CAR DESTROYED');
-
-    // Busted condition 2: surrounded while slow
-    const copCount = game.cops.nearbyGroundCount;
-    const sp = Math.hypot(game.car.vx, game.car.vy);
-    const surrounded = copCount >= 4 && sp < 60;
-    if (surrounded) {
-      game.pinnedTimer += dt;
-      if (game.pinnedTimer > 2.5) busted('SURROUNDED');
-    } else {
-      game.pinnedTimer = 0;
-    }
-
-    Camera.follow(game.car, dt);
-    if (Math.random() < 1 - Math.pow(0.998, dt * 60)) Glitch.trigger(8);
-
-    UI.updateHUD(game.car, Heat.wholeStars);
-  }
-
-  Audio.update(game.car, game.cops.cops, Math.hypot(Input.axis.x, Input.axis.y), game.running && !document.hidden, now/1000);
-  Trails.update(dt, game.running ? game.car : null);
-  Impact.update(dt);
-  Glitch.update(dt);
-  Camera.updateEffects(dt);
-
-  // ===== Draw =====
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#05010f';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  Camera.apply(ctx, W, H);
-
-  if (game.world) game.world.draw(ctx);
-  Trails.draw(ctx);
-  if (game.props) game.props.draw(ctx);
-  const night = 1 - (game.world?.dayNight ?? 0.5);
-  if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100, night);
-  if (game.cops)  game.cops.draw(ctx, night);
-  if (game.car)   game.car.draw(ctx, night);
-  Impact.draw(ctx);
-
-  ctx.restore();
-
-  // Day/night
-  if (game.world) {
-    const n = game.world.dayNight;
-    const nightStrength = (1 - n) * 0.35;
-    if (nightStrength > 0) {
-      ctx.fillStyle = `rgba(20, 0, 60, ${nightStrength})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-  }
-
-  if (game.car && !motion.matches) NitroFX.draw(ctx, W, H, game.car);
-  drawRadar(ctx, W, H);
-  Glitch.draw(ctx, W, H);
-
-  requestAnimationFrame(loop);
-}
-
-function drawRadar(ctx, W, H) {
-  if (!game.car || !game.cops) return;
-  const cx = W - 100;
-  const cy = 100;
-  const r  = 70;
-
-  ctx.save();
-
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-  ctx.beginPath();
-  ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
-  ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-  ctx.stroke();
-
-  ctx.fillStyle = '#0ff';
-  ctx.shadowColor = '#0ff';
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  game.cops.drawOnRadar(ctx, game.car, cx, cy, r);
-
-  ctx.restore();
-}
-
-requestAnimationFrame(loop);
-+earned.reward+(earned.personalBest?' · NEW BEST':'') : t.result.reason;
-  trialResult.hidden=false;
-  refreshTrialHUD();
-}
-function freeRoam() {
-  trialResult.hidden=true;
-  initWorld();
-  Input.clear();
-  game.running=true;
-  UI.hideOverlay();
-  refreshTrialHUD();
-}
-document.getElementById('btn-trial').addEventListener('click',()=>startTrial(TRIALS.find(r=>r.id===trialSelect.value)));
-document.getElementById('btn-retry-trial').addEventListener('click',()=>startTrial(game.trial?.route));
-document.getElementById('btn-free-roam').addEventListener('click',freeRoam);
-document.getElementById('btn-activities').addEventListener('click',()=>{
-  if(!game.running||game.busted)return;
-  game.trial?.fail('ABANDONED');
-  game.running=false;
-  Input.clear();
-  refreshTrials();
-  UI.showOverlay();
-});
-
-function respawn() {
-  void Audio.unlock();
-  const el = document.getElementById('busted-screen');
-  if (el) el.classList.remove('show');
-  game.busted = false;
-  initWorld();
-  game.running = true;
-}
-
-UI.init({
-  onStart: () => {
-    void Audio.unlock();
-    if (game.busted) { respawn(); return; }
-    game.running = true;
-    UI.hideOverlay();
-  },
-  onOpenSettings: () => UI.showSettings(),
-  onCloseSettings: () => UI.hideSettings(),
-  onSetCtrlMode: (mode) => Input.setMode(mode),
-});
-
-document.getElementById('btn-busted-restart')?.addEventListener('click', respawn);
-
-UI.setCtrlMode(Save.data.settings.ctrlMode || 'wasd');
-Input.init(canvas);
-initWorld();
-
-let last = performance.now();
-
-function loop(now) {
-  const dt = Math.min(0.033, (now - last) / 1000);
-  last = now;
-
-  if (game.running && !game.busted) {
-    game.car.update(dt, game.world);
-
-    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
-    clampToWorld(game.car, game.world);
-
-    game.world.update(dt);
-
-    // Cops + props + heat
-    game.cops.update(dt, game.car);
-    game.props.update(dt, game.car);
-    game.traffic.update(dt, game.car);
-    if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
-    clampToWorld(game.car, game.world);
-    Heat.update(dt, game.cops.activeCount, game.car);
-
-    // Busted condition 1: health = 0
-    if (game.car.health <= 0) busted('CAR DESTROYED');
-
-    // Busted condition 2: surrounded while slow
-    const copCount = game.cops.nearbyGroundCount;
-    const sp = Math.hypot(game.car.vx, game.car.vy);
-    const surrounded = copCount >= 4 && sp < 60;
-    if (surrounded) {
-      game.pinnedTimer += dt;
-      if (game.pinnedTimer > 2.5) busted('SURROUNDED');
-    } else {
-      game.pinnedTimer = 0;
-    }
-
-    Camera.follow(game.car, dt);
-    if (Math.random() < 1 - Math.pow(0.998, dt * 60)) Glitch.trigger(8);
-
-    UI.updateHUD(game.car, Heat.wholeStars);
-  }
-
-  Audio.update(game.car, game.cops.cops, Math.hypot(Input.axis.x, Input.axis.y), game.running && !document.hidden, now/1000);
-  Trails.update(dt, game.running ? game.car : null);
-  Impact.update(dt);
-  Glitch.update(dt);
-  Camera.updateEffects(dt);
-
-  // ===== Draw =====
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#05010f';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  Camera.apply(ctx, W, H);
-
-  if (game.world) game.world.draw(ctx);
-  Trails.draw(ctx);
-  if (game.props) game.props.draw(ctx);
-  const night = 1 - (game.world?.dayNight ?? 0.5);
-  if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100, night);
-  if (game.cops)  game.cops.draw(ctx, night);
-  if (game.car)   game.car.draw(ctx, night);
-  Impact.draw(ctx);
-
-  ctx.restore();
-
-  // Day/night
-  if (game.world) {
-    const n = game.world.dayNight;
-    const nightStrength = (1 - n) * 0.35;
-    if (nightStrength > 0) {
-      ctx.fillStyle = `rgba(20, 0, 60, ${nightStrength})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-  }
-
-  if (game.car && !motion.matches) NitroFX.draw(ctx, W, H, game.car);
-  drawRadar(ctx, W, H);
-  Glitch.draw(ctx, W, H);
-
-  requestAnimationFrame(loop);
-}
-
-function drawRadar(ctx, W, H) {
-  if (!game.car || !game.cops) return;
-  const cx = W - 100;
-  const cy = 100;
-  const r  = 70;
-
-  ctx.save();
-
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-  ctx.beginPath();
-  ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
-  ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-  ctx.stroke();
-
-  ctx.fillStyle = '#0ff';
-  ctx.shadowColor = '#0ff';
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  game.cops.drawOnRadar(ctx, game.car, cx, cy, r);
 
   ctx.restore();
 }
