@@ -4,6 +4,7 @@ import { COP_TYPES, pickCopType, maxCopsForHeat } from '../data/cops-config.js';
 import { Heat } from './heat.js';
 import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
+import { drawVehicle, drawHelicopter, policeShape } from './vehicle-art.js';
 import { handleCarCollision } from './damage.js';
 
 export class Cop {
@@ -124,95 +125,25 @@ export class Cop {
     this.sirenPhase += dt * 12;
   }
 
-  draw(ctx) {
+  draw(ctx, night = 0.5) {
     const cfg = this.cfg;
-
+    ctx.save();
+    ctx.translate(this.x,this.y);
     if (cfg.flying) {
-      // Helicopter — shadow + body offset above
-      ctx.save();
-      ctx.translate(this.x, this.y);
-
-      // Spotlight toward player
-      ctx.globalAlpha = 0.15;
-      ctx.fillStyle = '#ffee00';
-      ctx.beginPath();
-      ctx.arc(0, 0, 160, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Body
-      ctx.fillStyle = cfg.color;
-      ctx.shadowColor = cfg.accent;
-      ctx.shadowBlur = 20;
-      ctx.beginPath();
-      ctx.arc(0, 0, 18, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Rotor (spinning line)
-      const rotorAng = performance.now() * 0.02;
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(rotorAng) * 34, Math.sin(rotorAng) * 34);
-      ctx.lineTo(-Math.cos(rotorAng) * 34, -Math.sin(rotorAng) * 34);
-      ctx.stroke();
-
-      // Blinking light
-      const blink = (Math.sin(this.sirenPhase) + 1) / 2;
-      ctx.fillStyle = blink > 0.5 ? '#ff0000' : '#0000ff';
-      ctx.beginPath();
-      ctx.arc(0, -20, 4, 0, Math.PI * 2);
-      ctx.fill();
+      drawHelicopter(ctx,{angle:this.angle,phase:performance.now()*0.02,reduced:Camera.reduced});
       ctx.restore();
       return;
     }
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.beginPath();
-    ctx.ellipse(3, 5, this.radius + 4, this.radius * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body
-    ctx.fillStyle = cfg.color;
-    ctx.shadowColor = cfg.accent;
-    ctx.shadowBlur = 14;
-
-    // Draw a car-like shape (rect for simplicity per type)
-    const L = this.radius * 1.3;
-    const W = this.radius * 0.9;
-    ctx.fillRect(-L/2, -W/2, L, W);
-
-    // Undercover has no visible marker until close
-    const isStealthHidden = cfg.stealth && !this.closeToPlayer;
-
-    // Light bar (red/blue flash) — hidden if stealth
-    if (!isStealthHidden) {
-      const blink = Math.sin(this.sirenPhase) > 0;
-      ctx.shadowBlur = 20;
-      ctx.fillStyle = blink ? '#ff0022' : '#0011ff';
-      ctx.shadowColor = blink ? '#ff0022' : '#0011ff';
-      ctx.fillRect(-L/2 + 2, -W/2 - 4, L - 4, 4);
-    }
-
-    // Accent stripe
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = cfg.accent;
-    ctx.fillRect(-2, -W/2, 4, W);
-
-    // Health bar
+    drawVehicle(ctx,{kind:policeShape(this.typeId),color:cfg.color,accent:cfg.accent,
+      police:true,siren:!cfg.stealth||this.closeToPlayer,phase:this.sirenPhase,
+      reduced:Camera.reduced,health:this.health/this.maxHealth,night});
     if (this.health < this.maxHealth) {
-      const barW = 30;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(-barW/2, -this.radius - 12, barW, 4);
+      ctx.fillRect(-15,-this.radius-12,30,4);
       ctx.fillStyle = '#ff0066';
-      ctx.fillRect(-barW/2, -this.radius - 12, barW * (this.health / this.maxHealth), 4);
+      ctx.fillRect(-15,-this.radius-12,30*Math.max(0,this.health/this.maxHealth),4);
     }
-
     ctx.restore();
   }
 }
@@ -329,8 +260,8 @@ export class CopsManager {
     return placed;
   }
 
-  draw(ctx) {
-    for (const c of this.cops) c.draw(ctx);
+  draw(ctx, night = 0.5) {
+    for (const c of this.cops) c.draw(ctx, night);
   }
 
   drawOnRadar(ctx, player, cx, cy, radarR) {

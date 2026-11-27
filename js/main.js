@@ -181,9 +181,10 @@ function loop(now) {
   if (game.world) game.world.draw(ctx);
   Trails.draw(ctx);
   if (game.props) game.props.draw(ctx);
-  if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100);
-  if (game.cops)  game.cops.draw(ctx);
-  if (game.car)   game.car.draw(ctx);
+  const night = 1 - (game.world?.dayNight ?? 0.5);
+  if (game.traffic) game.traffic.draw(ctx, game.car, Math.hypot(W, H) / (2 * Camera.zoom) + 100, night);
+  if (game.cops)  game.cops.draw(ctx, night);
+  if (game.car)   game.car.draw(ctx, night);
   Impact.draw(ctx);
 
   ctx.restore();
