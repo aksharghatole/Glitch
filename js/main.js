@@ -1,6 +1,7 @@
 // Entry point — Phase 3.1 (cops + heat + pursuit + busted + props).
 
 import { Save } from './save.js';
+import { TRIALS, TimeTrial, recordTrial } from './activities.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
@@ -75,11 +76,13 @@ const game = {
   props: null,
   traffic: null,
   pinnedTimer: 0,
+  trial: null,
 };
 
 function initWorld() {
   const cityId = Save.data.currentCity || 'neon_district';
   game.world = new World(cityId);
+  game.trial = null;
   const start = game.world.city.start;
   game.car = new Car(start.x, start.y);
   game.cops = new CopsManager(game.world);
@@ -102,6 +105,8 @@ function busted(reason) {
   if (game.busted) return;
   game.busted = true;
   game.running = false;
+  game.trial?.fail(reason);
+  document.getElementById('trial-result').hidden = true;
   Glitch.trigger(30);
   Camera.addShake(20);
 
@@ -119,19 +124,95 @@ function busted(reason) {
   }
 }
 
+const trialHUD = document.getElementById('trial-hud');
+const trialResult = document.getElementById('trial-result');
+const trialSelect = document.getElementById('trial-select');
+function refreshTrials() {
+  trialSelect.replaceChildren();
+  for (const route of TRIALS.filter(r => r.city === game.world.city.id)) {
+    const option = document.createElement('option');
+    option.value = route.id;
+    const best = Save.data.trialRecords?.[route.id];
+    option.textContent = route.name + ' · ' + route.limit + 's · $' + route.reward +
+      (Number.isFinite(best) ? ' · PB ' + best.toFixed(2) + 's' : '');
+    trialSelect.append(option);
+  }
+  document.getElementById('btn-trial').disabled = !trialSelect.options.length;
+}
+function startTrial(route) {
+  if (!route) return;
+  void Audio.unlock();
+  initWorld();
+  game.trial = new TimeTrial(route);
+  const start = route.points[0];
+  game.car.x = Camera.x = start.x;
+  game.car.y = Camera.y = start.y;
+  Input.clear();
+  trialResult.hidden = true;
+  UI.hideOverlay();
+  game.running = true;
+  game.busted = false;
+  refreshTrialHUD();
+}
+function refreshTrialHUD() {
+  const t = game.trial;
+  trialHUD.hidden = !t || !game.running;
+  document.getElementById('cash').textContent = '$' + Math.floor(Save.data.cash || 0);
+  if (!t || !game.running) return;
+  trialHUD.textContent = t.state === 'countdown' ? 'GET READY · ' + Math.ceil(t.countdown) :
+    t.route.name + ' · ' + Math.min(t.index,t.route.points.length-1) + '/' +
+    (t.route.points.length-1) + ' · ' + t.remaining.toFixed(1) + 's';
+}
+function finishTrial() {
+  const t = game.trial;
+  game.running = false;
+  Input.clear();
+  const earned = recordTrial(Save.data,t.route,t.result);
+  if (earned) Save.save();
+  document.getElementById('trial-title').textContent = earned ? 'TRIAL COMPLETE' : 'TRIAL FAILED';
+  document.getElementById('trial-summary').textContent = earned ?
+    t.elapsed.toFixed(2) + 's · +$' + earned.reward + (earned.personalBest ? ' · NEW BEST' : '') : t.result.reason;
+  trialResult.hidden = false;
+  refreshTrialHUD();
+}
+function freeRoam() {
+  trialResult.hidden = true;
+  initWorld();
+  Input.clear();
+  game.running = true;
+  UI.hideOverlay();
+  refreshTrialHUD();
+}
+document.getElementById('btn-trial').addEventListener('click', () => startTrial(TRIALS.find(r => r.id === trialSelect.value)));
+document.getElementById('btn-retry-trial').addEventListener('click', () => startTrial(game.trial?.route));
+document.getElementById('btn-free-roam').addEventListener('click', freeRoam);
+document.getElementById('btn-activities').addEventListener('click', () => {
+  if (!game.running || game.busted) return;
+  game.trial?.fail('ABANDONED');
+  game.running = false;
+  Input.clear();
+  refreshTrials();
+  refreshTrialHUD();
+  UI.showOverlay();
+});
+
 function respawn() {
   void Audio.unlock();
   const el = document.getElementById('busted-screen');
   if (el) el.classList.remove('show');
   game.busted = false;
+  const route=game.trial?.route;
+  if(route) { startTrial(route); return; }
   initWorld();
   game.running = true;
+  refreshTrialHUD();
 }
 
 UI.init({
   onStart: () => {
     void Audio.unlock();
     if (game.busted) { respawn(); return; }
+    if(game.trial) { freeRoam(); return; }
     game.running = true;
     UI.hideOverlay();
   },
@@ -145,6 +226,8 @@ document.getElementById('btn-busted-restart')?.addEventListener('click', respawn
 UI.setCtrlMode(Save.data.settings.ctrlMode || 'wasd');
 Input.init(canvas);
 initWorld();
+refreshTrials();
+refreshTrialHUD();
 
 let last = performance.now();
 
@@ -152,7 +235,10 @@ function loop(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
 
-  if (game.running && !game.busted) {
+  if(game.running && game.trial?.state==='countdown') {
+    game.trial.update(dt,game.car);
+    refreshTrialHUD();
+  } else if (game.running && !game.busted) {
     game.car.update(dt, game.world);
 
     if (!game.car.airborne) resolveBuildingCollision(game.car, game.world);
@@ -185,6 +271,11 @@ function loop(now) {
     Camera.follow(game.car, dt);
     if (Math.random() < 1 - Math.pow(0.998, dt * 60)) Glitch.trigger(8);
 
+    if(game.running && game.trial) {
+      game.trial.update(dt,game.car);
+      if(game.trial.result) finishTrial();
+    }
+    refreshTrialHUD();
     UI.updateHUD(game.car, Heat.wholeStars);
   }
 
@@ -203,6 +294,7 @@ function loop(now) {
   Camera.apply(ctx, W, H);
 
   if (game.world) game.world.draw(ctx);
+  game.trial?.draw(ctx);
   Trails.draw(ctx);
   if (game.props) game.props.draw(ctx);
   const night = 1 - (game.world?.dayNight ?? 0.5);
@@ -260,6 +352,12 @@ function drawRadar(ctx, W, H) {
   ctx.fill();
 
   game.cops.drawOnRadar(ctx, game.car, cx, cy, r);
+  const target=game.trial?.target;
+  if(target){
+    const dx=target.x-game.car.x,dy=target.y-game.car.y;
+    const scale=(r-6)/Math.max(2000,Math.hypot(dx,dy));
+    ctx.fillStyle='#ffe66b';ctx.beginPath();ctx.arc(cx+dx*scale,cy+dy*scale,5,0,Math.PI*2);ctx.fill();
+  }
 
   ctx.restore();
 }
