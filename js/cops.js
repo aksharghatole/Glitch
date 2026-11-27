@@ -219,54 +219,39 @@ export class Cop {
 
 // ===== Cops Manager =====
 export class CopsManager {
-  constructor(world) {
+  constructor(world, random = Math.random) {
     this.world = world;
+    this.random = random;
     this.cops = [];
     this.spawnTimer = 0;
     this.roadblockTimer = 0;
     this.activeCount = 0;
+    this.nearbyGroundCount = 0;
   }
 
   reset() {
     this.cops = [];
     this.spawnTimer = 0;
     this.roadblockTimer = 0;
+    this.activeCount = 0;
+    this.nearbyGroundCount = 0;
   }
 
-  // Called every frame
+  // Count only nearby units as active; distant police cannot arrest the player.
   update(dt, player) {
     const heat = Heat.stars;
-    const maxCops = Math.max(2, maxCopsForHeat(heat)); // always allow at least 2
+    const cap = Math.floor(Math.max(2, maxCopsForHeat(heat)));
 
-    // Spawn new cops
-    this.spawnTimer += dt;
-    if (this.spawnTimer > 1.2 && this.cops.length < maxCops && heat >= 0.4) {
-      this.spawnTimer = 0;
-      this.spawnCop(player, heat);
-    }
-
-    // Roadblocks (heat 4+)
-    if (heat >= 4) {
-      this.roadblockTimer += dt;
-      if (this.roadblockTimer > 8) {
-        this.roadblockTimer = 0;
-        this.spawnRoadblock(player);
-      }
-    }
-
-    // Update each cop
     for (let i = this.cops.length - 1; i >= 0; i--) {
       const c = this.cops[i];
+      const distance = Math.hypot(c.x - player.x, c.y - player.y);
+      if (distance > (c.cfg.static ? 1100 : 1600)) {
+        this.cops.splice(i, 1);
+        continue;
+      }
       c.update(dt, player, this.world);
-
-      // Collision with player
       handleCarCollision(player, c, dt);
-
-      // Stealth visibility check
-      const d = Math.hypot(c.x - player.x, c.y - player.y);
-      c.closeToPlayer = d < 260;
-
-      // Remove dead
+      c.closeToPlayer = Math.hypot(c.x - player.x, c.y - player.y) < 260;
       if (c.health <= 0) {
         Glitch.trigger(20);
         Camera.addShake(12);
@@ -275,42 +260,73 @@ export class CopsManager {
       }
     }
 
-    this.activeCount = this.cops.length;
+    this.activeCount = this.cops.filter(c => Math.hypot(c.x - player.x, c.y - player.y) <= 650).length;
+    this.nearbyGroundCount = this.cops.filter(c =>
+      !c.cfg.flying && Math.hypot(c.x - player.x, c.y - player.y) <= 150
+    ).length;
+
+    // A driver who breaks contact and slows down gets a chance to cool off.
+    const speeding = player.speedKmh > 80;
+    const pursuit = this.activeCount > 0 || speeding;
+    this.spawnTimer += dt;
+    if (pursuit && this.spawnTimer > 1.2 && this.cops.length < cap && heat >= 0.4) {
+      this.spawnTimer = 0;
+      this.spawnCop(player, heat);
+    }
+
+    if (heat >= 4 && pursuit && this.cops.length < cap) {
+      this.roadblockTimer += dt;
+      if (this.roadblockTimer > 8) {
+        this.roadblockTimer = 0;
+        this.spawnRoadblock(player, cap - this.cops.length);
+      }
+    } else {
+      this.roadblockTimer = 0;
+    }
+  }
+
+  // Never spawn inside buildings, outside the map or on another ground unit.
+  canSpawn(x, y, cfg) {
+    const margin = Math.max(50, cfg.radius);
+    if (x < margin || y < margin || x > this.world.w - margin || y > this.world.h - margin) return false;
+    if (!cfg.flying && this.world.collidesCircle(x, y, cfg.radius)) return false;
+    return !this.cops.some(c => Boolean(c.cfg.flying) === Boolean(cfg.flying) &&
+      Math.hypot(c.x - x, c.y - y) < c.radius + cfg.radius + 12);
   }
 
   spawnCop(player, heat) {
     const typeId = pickCopType(heat);
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 700 + Math.random() * 300;
-    let x = player.x + Math.cos(angle) * dist;
-    let y = player.y + Math.sin(angle) * dist;
-
-    // Clamp inside world
-    x = Math.max(50, Math.min(this.world.w - 50, x));
-    y = Math.max(50, Math.min(this.world.h - 50, y));
-
-    this.cops.push(new Cop(typeId, x, y));
+    const cfg = COP_TYPES[typeId];
+    for (let i = 0; i < 24; i++) {
+      const angle = this.random() * Math.PI * 2;
+      const dist = 700 + this.random() * 300;
+      const x = player.x + Math.cos(angle) * dist;
+      const y = player.y + Math.sin(angle) * dist;
+      if (!this.canSpawn(x, y, cfg)) continue;
+      this.cops.push(new Cop(typeId, x, y));
+      return true;
+    }
+    return false;
   }
 
-  spawnRoadblock(player) {
-    // Place ahead of player's velocity
-    const sp = Math.hypot(player.vx, player.vy) || 1;
-    const ahead = 500;
-    const tx = player.x + (player.vx / sp) * ahead;
-    const ty = player.y + (player.vy / sp) * ahead;
-
-    const count = 3;
+  spawnRoadblock(player, slots = 3) {
+    const sp = Math.hypot(player.vx, player.vy);
+    if (sp < 60 || slots <= 0) return 0;
+    const tx = player.x + player.vx / sp * 500;
+    const ty = player.y + player.vy / sp * 500;
     const perpX = -player.vy / sp;
-    const perpY =  player.vx / sp;
-
-    for (let i = 0; i < count; i++) {
-      const off = (i - (count - 1) / 2) * 90;
+    const perpY = player.vx / sp;
+    let placed = 0;
+    for (const off of [0, -90, 90]) {
+      if (placed >= slots) break;
       const x = tx + perpX * off;
       const y = ty + perpY * off;
-      if (x < 50 || y < 50 || x > this.world.w - 50 || y > this.world.h - 50) continue;
+      if (!this.canSpawn(x, y, COP_TYPES.roadblock)) continue;
       this.cops.push(new Cop('roadblock', x, y));
+      placed++;
     }
-    Glitch.trigger(10);
+    if (placed > 0) Glitch.trigger(10);
+    return placed;
   }
 
   draw(ctx) {
