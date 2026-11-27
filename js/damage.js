@@ -4,6 +4,7 @@ import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
 import { Heat } from './heat.js';
 import { Impact } from './impact.js';
+import { Audio } from './audio.js';
 
 export function handleCarCollision(player, cop, dt) {
   // Air support tracks the player but is not a physical ground obstacle.
@@ -74,6 +75,7 @@ export function handleCarCollision(player, cop, dt) {
       // Heat spike only on solid hits
       if (impact > 1.0) {
         Heat.addHeat(0.35);
+        Audio.hit(playerMomentum);
         Impact.hit(player.x + nx * player.radius, player.y + ny * player.radius,
           nx, ny, playerMomentum, '#ffd068');
         Glitch.trigger(Math.min(20, impact * 4));

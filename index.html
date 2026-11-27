@@ -15,6 +15,8 @@
     <div id="nitro-bar"><div id="nitro-fill"></div></div>
   </div>
 
+  <button id="btn-sound" class="sound-toggle" aria-pressed="true">SOUND ON</button>
+
   <div id="joystick-zone">
     <div id="joystick-base">
       <div id="joystick-knob"></div>
@@ -44,6 +46,8 @@
         <option value="both">Both</option>
       </select>
     </label>
+    <label>Sound volume <input id="audio-volume" type="range" min="0" max="100" value="50"></label>
+    <label><input id="audio-mute" type="checkbox"> Mute sound</label>
     <button id="btn-close-settings">CLOSE</button>
   </div>
 

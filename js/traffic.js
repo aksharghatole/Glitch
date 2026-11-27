@@ -3,6 +3,7 @@ import { Heat } from './heat.js';
 import { Glitch } from './glitch.js';
 import { Camera } from './camera.js';
 import { Impact } from './impact.js';
+import { Audio } from './audio.js';
 import { drawVehicle } from './vehicle-art.js';
 
 const COLORS = ['#5475a6', '#b76f48', '#617e77', '#8b649f', '#b6bac6'];
@@ -76,6 +77,7 @@ export function collideTraffic(player, car) {
       car.cooldown = 0.8;
       car.speed *= 0.25;
       Heat.addHeat(0.45);
+      Audio.hit(closing);
       Impact.hit(player.x + nx * player.radius, player.y + ny * player.radius,
         nx, ny, closing, '#ffac72');
       Camera.addShake(Math.min(9, closing * 0.025));
